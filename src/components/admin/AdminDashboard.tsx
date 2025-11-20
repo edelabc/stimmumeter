@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, Menu as MenuIcon, FileText, Settings as SettingsIcon, Home, Brain, DollarSign, Wallet, CreditCard, ScrollText, FileCheck, List } from 'lucide-react';
+import { Users, Menu as MenuIcon, FileText, Settings as SettingsIcon, Home, Brain, DollarSign, Wallet, CreditCard, ScrollText, FileCheck, List, BarChart3 } from 'lucide-react';
 import { checkCurrentUserIsAdmin } from '../../lib/admin';
 import { UserManagement } from './UserManagement';
 import { MenuManagement } from './MenuManagement';
@@ -12,8 +12,9 @@ import { PrepaidRechargeManagement } from './PrepaidRechargeManagement';
 import { StripeConfiguration } from './StripeConfiguration';
 import { AuditLogViewer } from './AuditLogViewer';
 import { AgreementsManagement } from './AgreementsManagement';
+import { StandardIndicatorsManagement } from './StandardIndicatorsManagement';
 
-type AdminSection = 'users' | 'menu' | 'legal' | 'footer' | 'footer-menu' | 'ai' | 'billing' | 'prepaid' | 'stripe' | 'audit' | 'agreements';
+type AdminSection = 'users' | 'menu' | 'legal' | 'footer' | 'footer-menu' | 'ai' | 'billing' | 'prepaid' | 'stripe' | 'audit' | 'agreements' | 'indicators';
 
 export function AdminDashboard() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -57,6 +58,7 @@ export function AdminDashboard() {
 
   const sections = [
     { id: 'users' as AdminSection, name: 'Benutzerverwaltung', icon: Users },
+    { id: 'indicators' as AdminSection, name: 'Standard-Indikatoren', icon: BarChart3 },
     { id: 'menu' as AdminSection, name: 'Menü bearbeiten', icon: MenuIcon },
     { id: 'footer-menu' as AdminSection, name: 'Footer-Menü bearbeiten', icon: List },
     { id: 'agreements' as AdminSection, name: 'Vereinbarungen', icon: FileCheck },
@@ -123,6 +125,7 @@ export function AdminDashboard() {
           <div className="lg:col-span-3">
             <div className="bg-white rounded-xl shadow-sm p-6">
               {activeSection === 'users' && <UserManagement />}
+              {activeSection === 'indicators' && <StandardIndicatorsManagement />}
               {activeSection === 'menu' && <MenuManagement />}
               {activeSection === 'footer-menu' && <FooterMenuManagement />}
               {activeSection === 'agreements' && <AgreementsManagement />}

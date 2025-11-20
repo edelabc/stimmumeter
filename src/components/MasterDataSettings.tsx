@@ -104,13 +104,25 @@ export function MasterDataSettings({
   const handleCreate = async () => {
     if (!formData.name.trim()) return;
 
+    const trimmedName = formData.name.trim();
+    
+    // Prüfe, ob der Benutzer bereits einen Indikator mit diesem Namen hat
+    const existingIndicator = indicators.find(
+      (ind) => ind.user_id === userId && ind.name.toLowerCase().trim() === trimmedName.toLowerCase()
+    );
+
+    if (existingIndicator) {
+      alert('Du hast bereits einen Indikator mit diesem Namen. Bitte wähle einen anderen Namen.');
+      return;
+    }
+
     const maxSortOrder = Math.max(...indicators.map(i => i.sort_order), 0);
 
     const { error } = await supabase
       .from('mood_indicators')
       .insert([{
         ...formData,
-        name: formData.name.trim(),
+        name: trimmedName,
         user_id: userId,
         sort_order: maxSortOrder + 1,
         color: formData.color_start,
@@ -118,7 +130,11 @@ export function MasterDataSettings({
 
     if (error) {
       console.error('Error creating indicator:', error);
-      alert('Fehler: ' + error.message);
+      if (error.code === '23505') {
+        alert('Du hast bereits einen Indikator mit diesem Namen. Bitte wähle einen anderen Namen.');
+      } else {
+        alert('Fehler: ' + error.message);
+      }
       return;
     }
 
@@ -128,13 +144,33 @@ export function MasterDataSettings({
   };
 
   const handleUpdate = async (id: string) => {
+    const trimmedName = formData.name.trim();
+    
+    // Prüfe, ob der Benutzer bereits einen anderen Indikator mit diesem Namen hat
+    const existingIndicator = indicators.find(
+      (ind) => ind.id !== id && ind.user_id === userId && ind.name.toLowerCase().trim() === trimmedName.toLowerCase()
+    );
+
+    if (existingIndicator) {
+      alert('Du hast bereits einen Indikator mit diesem Namen. Bitte wähle einen anderen Namen.');
+      return;
+    }
+
     const { error } = await supabase
       .from('mood_indicators')
-      .update(formData)
+      .update({
+        ...formData,
+        name: trimmedName,
+      })
       .eq('id', id);
 
     if (error) {
       console.error('Error updating indicator:', error);
+      if (error.code === '23505') {
+        alert('Du hast bereits einen Indikator mit diesem Namen. Bitte wähle einen anderen Namen.');
+      } else {
+        alert('Fehler: ' + error.message);
+      }
       return;
     }
 

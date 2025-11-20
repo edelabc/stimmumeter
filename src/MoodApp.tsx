@@ -624,6 +624,21 @@ export function MoodApp() {
                         </div>
                       ) : (
                         <>
+                          <div className="mb-4 flex justify-center">
+                            <button
+                              onClick={() => {
+                                setEditingEntry(null);
+                                setSelectedValues({});
+                                setNote('');
+                                setEntryDate(new Date().toISOString().slice(0, 16));
+                                setIsEntryModalOpen(true);
+                              }}
+                              className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-full hover:from-blue-700 hover:to-teal-700 transition-all shadow-lg hover:shadow-xl"
+                              title="Neuer Eintrag"
+                            >
+                              <Plus className="w-6 h-6" />
+                            </button>
+                          </div>
                           <div className="space-y-4 mb-6">
                             {moodEntries.map((entry) => (
                               <div
@@ -708,22 +723,6 @@ export function MoodApp() {
                                 )}
                               </div>
                             ))}
-                          </div>
-
-                          <div className="flex justify-center">
-                            <button
-                              onClick={() => {
-                                setEditingEntry(null);
-                                setSelectedValues({});
-                                setNote('');
-                                setEntryDate(new Date().toISOString().slice(0, 16));
-                                setIsEntryModalOpen(true);
-                              }}
-                              className="inline-flex items-center justify-center w-14 h-14 bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-full hover:from-blue-700 hover:to-teal-700 transition-all shadow-lg hover:shadow-xl"
-                              title="Neuer Eintrag"
-                            >
-                              <Plus className="w-6 h-6" />
-                            </button>
                           </div>
                         </>
                       )}
