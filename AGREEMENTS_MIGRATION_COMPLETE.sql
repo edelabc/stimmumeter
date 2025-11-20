@@ -23,6 +23,7 @@ CREATE TABLE IF NOT EXISTS t_vereinbarungstitel (
   titel text NOT NULL,
   beschreibung text,
   erstellt_von_user_id uuid REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  gesperrt boolean NOT NULL DEFAULT false,
   created_at timestamptz DEFAULT now(),
   updated_at timestamptz DEFAULT now()
 );
@@ -395,5 +396,33 @@ COMMENT ON COLUMN menu_items.icon IS 'Optional icon identifier for the menu item
 -- WHERE table_name = 'menu_items' 
 -- AND column_name IN ('linked_agreement_id', 'slug', 'icon');
 --
+-- ============================================
+-- MIGRATION 3: gesperrt Feld zu t_vereinbarungstitel hinzufügen
+-- ============================================
+
+-- Füge gesperrt Feld hinzu (Standard: false)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns 
+    WHERE table_schema = 'public'
+    AND table_name = 't_vereinbarungstitel' 
+    AND column_name = 'gesperrt'
+  ) THEN
+    ALTER TABLE t_vereinbarungstitel 
+    ADD COLUMN gesperrt boolean NOT NULL DEFAULT false;
+    
+    -- Kommentar hinzufügen
+    COMMENT ON COLUMN t_vereinbarungstitel.gesperrt IS 
+      'Gibt an, ob der Dokumenten-Titel gesperrt ist. Gesperrte Titel können nicht gelöscht oder in neuen Vereinbarungen verwendet werden.';
+  END IF;
+END $$;
+
+-- Index für bessere Performance bei Filtern
+CREATE INDEX IF NOT EXISTS idx_vereinbarungstitel_gesperrt 
+ON t_vereinbarungstitel(gesperrt);
+
+-- ============================================
+-- ENDE DER MIGRATION
 -- ============================================
 

@@ -6,6 +6,7 @@ export interface Vereinbarungstitel {
   titel: string;
   beschreibung: string | null;
   erstellt_von_user_id: string;
+  gesperrt: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -135,7 +136,7 @@ export async function createAgreementTitle(
  */
 export async function updateAgreementTitle(
   id: string,
-  updates: { titel?: string; beschreibung?: string }
+  updates: { titel?: string; beschreibung?: string; gesperrt?: boolean }
 ): Promise<Vereinbarungstitel> {
   const { data, error } = await supabase
     .from('t_vereinbarungstitel')
@@ -146,6 +147,16 @@ export async function updateAgreementTitle(
 
   if (error) throw error;
   return data;
+}
+
+/**
+ * Toggle agreement title lock
+ */
+export async function toggleAgreementTitleLock(
+  id: string,
+  gesperrt: boolean
+): Promise<Vereinbarungstitel> {
+  return updateAgreementTitle(id, { gesperrt });
 }
 
 /**

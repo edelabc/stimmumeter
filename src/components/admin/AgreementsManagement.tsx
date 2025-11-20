@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit2, Trash2, Save, X, FileText, History } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, FileText, History, Settings } from 'lucide-react';
 import {
   getAllAgreements,
   getAllAgreementTitles,
@@ -14,8 +14,10 @@ import {
   CreateAgreementData,
 } from '../../lib/agreement.service';
 import { PlatzhalterAuswahlModal } from './PlatzhalterAuswahlModal';
+import { DocumentTitleManagement } from './DocumentTitleManagement';
 
 export function AgreementsManagement() {
+  const [activeTab, setActiveTab] = useState<'agreements' | 'titles'>('agreements');
   const [agreements, setAgreements] = useState<Vereinbarung[]>([]);
   const [titles, setTitles] = useState<Vereinbarungstitel[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +50,12 @@ export function AgreementsManagement() {
     loadData();
   }, []);
 
+  useEffect(() => {
+    if (activeTab === 'agreements') {
+      loadData();
+    }
+  }, [activeTab]);
+
   const loadData = async () => {
     try {
       setLoading(true);
@@ -72,10 +80,20 @@ export function AgreementsManagement() {
         return;
       }
 
+      const cleanedData = {
+        ...formData,
+        gueltigkeit_von: formData.gueltigkeit_von || null,
+        gueltigkeit_bis: formData.gueltigkeit_bis || null,
+        bearbeiter_von: formData.bearbeiter_von || null,
+        bearbeiter_an: formData.bearbeiter_an || null,
+        kurze_zusammenfassung: formData.kurze_zusammenfassung || null,
+        anlagen: formData.anlagen || null,
+      };
+
       if (editingId) {
-        await updateAgreement(editingId, formData);
+        await updateAgreement(editingId, cleanedData);
       } else {
-        await createAgreement(formData);
+        await createAgreement(cleanedData);
       }
 
       setEditingId(null);
@@ -219,19 +237,55 @@ export function AgreementsManagement() {
             Erstellen und verwalten Sie rechtliche Dokumente wie AGB, Datenschutz, etc.
           </p>
         </div>
-        {!isAdding && !editingId && (
-          <button
-            onClick={() => {
-              setIsAdding(true);
-              resetForm();
-            }}
-            className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            <Plus size={20} />
-            Neue Vereinbarung
-          </button>
-        )}
       </div>
+
+      <div className="flex gap-2 mb-6 border-b border-gray-200">
+        <button
+          onClick={() => setActiveTab('agreements')}
+          className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+            activeTab === 'agreements'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <FileText size={18} />
+            Vereinbarungen
+          </div>
+        </button>
+        <button
+          onClick={() => setActiveTab('titles')}
+          className={`px-4 py-2 font-medium transition-colors border-b-2 ${
+            activeTab === 'titles'
+              ? 'border-blue-600 text-blue-600'
+              : 'border-transparent text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            <Settings size={18} />
+            Dokumententitel
+          </div>
+        </button>
+      </div>
+
+      {activeTab === 'titles' ? (
+        <DocumentTitleManagement onTitleChange={() => loadData()} />
+      ) : (
+        <>
+          <div className="flex items-center justify-between mb-6">
+            {!isAdding && !editingId && (
+              <button
+                onClick={() => {
+                  setIsAdding(true);
+                  resetForm();
+                }}
+                className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                <Plus size={20} />
+                Neue Vereinbarung
+              </button>
+            )}
+          </div>
 
       {/* Form */}
       {(isAdding || editingId) && (
@@ -608,6 +662,8 @@ export function AgreementsManagement() {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );

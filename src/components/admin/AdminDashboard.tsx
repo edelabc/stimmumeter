@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Users, Menu as MenuIcon, FileText, Settings as SettingsIcon, Home, Brain, DollarSign, Wallet, CreditCard, ScrollText, FileCheck } from 'lucide-react';
+import { Users, Menu as MenuIcon, FileText, Settings as SettingsIcon, Home, Brain, DollarSign, Wallet, CreditCard, ScrollText, FileCheck, List } from 'lucide-react';
 import { checkCurrentUserIsAdmin } from '../../lib/admin';
 import { UserManagement } from './UserManagement';
 import { MenuManagement } from './MenuManagement';
 import { LegalPagesManagement } from './LegalPagesManagement';
 import { FooterManagement } from './FooterManagement';
+import { FooterMenuManagement } from './FooterMenuManagement';
 import { AIModuleManagement } from './AIModuleManagement';
 import { BillingManagement } from './BillingManagement';
 import { PrepaidRechargeManagement } from './PrepaidRechargeManagement';
@@ -12,7 +13,7 @@ import { StripeConfiguration } from './StripeConfiguration';
 import { AuditLogViewer } from './AuditLogViewer';
 import { AgreementsManagement } from './AgreementsManagement';
 
-type AdminSection = 'users' | 'menu' | 'legal' | 'footer' | 'ai' | 'billing' | 'prepaid' | 'stripe' | 'audit' | 'agreements';
+type AdminSection = 'users' | 'menu' | 'legal' | 'footer' | 'footer-menu' | 'ai' | 'billing' | 'prepaid' | 'stripe' | 'audit' | 'agreements';
 
 export function AdminDashboard() {
   const [isAdmin, setIsAdmin] = useState(false);
@@ -57,9 +58,10 @@ export function AdminDashboard() {
   const sections = [
     { id: 'users' as AdminSection, name: 'Benutzerverwaltung', icon: Users },
     { id: 'menu' as AdminSection, name: 'Menü bearbeiten', icon: MenuIcon },
+    { id: 'footer-menu' as AdminSection, name: 'Footer-Menü bearbeiten', icon: List },
     { id: 'agreements' as AdminSection, name: 'Vereinbarungen', icon: FileCheck },
     { id: 'legal' as AdminSection, name: 'Rechtliche Seiten', icon: FileText },
-    { id: 'footer' as AdminSection, name: 'Footer bearbeiten', icon: SettingsIcon },
+    { id: 'footer' as AdminSection, name: 'Footer-Einstellungen', icon: SettingsIcon },
     { id: 'ai' as AdminSection, name: 'KI-Modul', icon: Brain },
     { id: 'billing' as AdminSection, name: 'Billing & Tarife', icon: DollarSign },
     { id: 'prepaid' as AdminSection, name: 'Prepaid Aufladebeträge', icon: Wallet },
@@ -122,6 +124,7 @@ export function AdminDashboard() {
             <div className="bg-white rounded-xl shadow-sm p-6">
               {activeSection === 'users' && <UserManagement />}
               {activeSection === 'menu' && <MenuManagement />}
+              {activeSection === 'footer-menu' && <FooterMenuManagement />}
               {activeSection === 'agreements' && <AgreementsManagement />}
               {activeSection === 'legal' && <LegalPagesManagement />}
               {activeSection === 'footer' && <FooterManagement />}

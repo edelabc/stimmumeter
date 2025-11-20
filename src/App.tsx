@@ -6,18 +6,21 @@ import { Layout } from './components/Layout';
 import { SEO } from './components/SEO';
 import { LegalPageViewer } from './components/LegalPageViewer';
 import { DocumentViewer } from './components/DocumentViewer';
+import { AgreementViewer } from './components/AgreementViewer';
 import { AdminDashboard } from './components/admin/AdminDashboard';
 import { MoodApp } from './MoodApp';
 import { PaymentSuccess } from './components/PaymentSuccess';
 import { PaymentCancel } from './components/PaymentCancel';
+import { CookieConsent } from './components/CookieConsent';
 import { supabase } from './lib/supabase';
 
-type Route = 'landing' | 'auth' | 'app' | 'admin' | 'legal' | 'docs' | 'payment-success' | 'payment-cancel';
+type Route = 'landing' | 'auth' | 'app' | 'admin' | 'legal' | 'docs' | 'agreement' | 'payment-success' | 'payment-cancel';
 
 interface AppState {
   route: Route;
   legalPageType?: string;
   documentSlug?: string;
+  agreementSlug?: string;
 }
 
 function App() {
@@ -65,6 +68,9 @@ function App() {
     } else if (path.startsWith('/docs/')) {
       const slug = path.replace('/docs/', '');
       setAppState({ route: 'docs', documentSlug: slug });
+    } else if (path.startsWith('/agreement/')) {
+      const slug = path.replace('/agreement/', '');
+      setAppState({ route: 'agreement', agreementSlug: slug });
     } else if (path === '/payment-success') {
       setAppState({ route: 'payment-success' });
     } else if (path === '/payment-cancel') {
@@ -89,6 +95,9 @@ function App() {
     } else if (url.startsWith('/docs/')) {
       const slug = url.replace('/docs/', '');
       setAppState({ route: 'docs', documentSlug: slug });
+    } else if (url.startsWith('/agreement/')) {
+      const slug = url.replace('/agreement/', '');
+      setAppState({ route: 'agreement', agreementSlug: slug });
     } else if (url === '/payment-success') {
       setAppState({ route: 'payment-success' });
     } else if (url === '/payment-cancel') {
@@ -168,7 +177,9 @@ function App() {
     return (
       <>
         <SEO title="Zahlung erfolgreich" />
-        <PaymentSuccess />
+        <Layout onNavigate={navigate}>
+          <PaymentSuccess />
+        </Layout>
       </>
     );
   }
@@ -177,7 +188,9 @@ function App() {
     return (
       <>
         <SEO title="Zahlung abgebrochen" />
-        <PaymentCancel />
+        <Layout onNavigate={navigate}>
+          <PaymentCancel />
+        </Layout>
       </>
     );
   }
@@ -204,9 +217,21 @@ function App() {
     );
   }
 
+  if (appState.route === 'agreement' && appState.agreementSlug) {
+    return (
+      <>
+        <SEO title="Vereinbarung" />
+        <Layout onNavigate={navigate}>
+          <AgreementViewer slug={appState.agreementSlug} />
+        </Layout>
+      </>
+    );
+  }
+
   return (
     <>
       <SEO />
+      <CookieConsent onNavigate={navigate} />
       <Layout onNavigate={navigate}>
         <LandingPage onGetStarted={handleGetStarted} />
       </Layout>
