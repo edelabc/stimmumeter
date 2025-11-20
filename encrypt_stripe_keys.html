@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stripe Keys Verschlüsseln</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .container {
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+      padding: 40px;
+      max-width: 700px;
+      width: 100%;
+    }
+    h1 {
+      color: #333;
+      margin-bottom: 10px;
+      font-size: 28px;
+    }
+    .subtitle {
+      color: #666;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+    .section {
+      margin-bottom: 25px;
+    }
+    label {
+      display: block;
+      color: #333;
+      font-weight: 600;
+      margin-bottom: 8px;
+      font-size: 14px;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 12px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: 'Courier New', monospace;
+      transition: border-color 0.3s;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: #667eea;
+    }
+    textarea {
+      min-height: 80px;
+      resize: vertical;
+    }
+    button {
+      width: 100%;
+      padding: 14px;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+    button:hover {
+      transform: translateY(-2px);
+    }
+    button:active {
+      transform: translateY(0);
+    }
+    .result {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f5f5f5;
+      border-radius: 8px;
+      display: none;
+    }
+    .result.show {
+      display: block;
+    }
+    .result h3 {
+      color: #333;
+      margin-bottom: 15px;
+      font-size: 18px;
+    }
+    .key-box {
+      background: white;
+      padding: 15px;
+      border-radius: 8px;
+      margin-bottom: 15px;
+      border: 2px solid #e0e0e0;
+    }
+    .key-box label {
+      color: #666;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+    .key-box textarea {
+      font-size: 11px;
+      min-height: 60px;
+      background: #fafafa;
+    }
+    .copy-btn {
+      background: #10b981;
+      padding: 8px 16px;
+      margin-top: 8px;
+      font-size: 14px;
+    }
+    .copy-btn:hover {
+      background: #059669;
+    }
+    .alert {
+      padding: 15px;
+      background: #fff3cd;
+      border: 2px solid #ffc107;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      color: #856404;
+    }
+    .alert strong {
+      display: block;
+      margin-bottom: 5px;
+    }
+    .sql-box {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      padding: 20px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 12px;
+      overflow-x: auto;
+      margin-top: 15px;
+    }
+    .success {
+      color: #10b981;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🔐 Stripe Keys Verschlüsseln</h1>
+    <p class="subtitle">Verschlüssle deine Stripe API-Keys für die Datenbank</p>
+
+    <div class="alert">
+      <strong>⚠️ Wichtig:</strong>
+      Hol dir echte Stripe Test-Keys von:<br>
+      <a href="https://dashboard.stripe.com/test/apikeys" target="_blank">
+        https://dashboard.stripe.com/test/apikeys
+      </a>
+    </div>
+
+    <form id="encryptForm">
+      <div class="section">
+        <label for="publishableKey">Publishable Key (pk_test_...)</label>
+        <input
+          type="text"
+          id="publishableKey"
+          placeholder="pk_test_51H..."
+          required
+        />
+      </div>
+
+      <div class="section">
+        <label for="secretKey">Secret Key (sk_test_...)</label>
+        <input
+          type="password"
+          id="secretKey"
+          placeholder="sk_test_51H..."
+          required
+        />
+      </div>
+
+      <button type="submit">🔒 Keys verschlüsseln</button>
+    </form>
+
+    <div class="result" id="result">
+      <h3>✅ Verschlüsselt!</h3>
+
+      <div class="key-box">
+        <label>Verschlüsselter Publishable Key:</label>
+        <textarea id="encryptedPub" readonly></textarea>
+        <button class="copy-btn" onclick="copyToClipboard('encryptedPub')">
+          📋 Kopieren
+        </button>
+      </div>
+
+      <div class="key-box">
+        <label>Verschlüsselter Secret Key:</label>
+        <textarea id="encryptedSec" readonly></textarea>
+        <button class="copy-btn" onclick="copyToClipboard('encryptedSec')">
+          📋 Kopieren
+        </button>
+      </div>
+
+      <div class="key-box">
+        <label>SQL-Update-Statement:</label>
+        <div class="sql-box" id="sqlStatement"></div>
+        <button class="copy-btn" onclick="copyToClipboard('sqlStatement')">
+          📋 SQL Kopieren
+        </button>
+      </div>
+
+      <div style="margin-top: 20px; padding: 15px; background: #e7f5ff; border-radius: 8px;">
+        <strong>Nächste Schritte:</strong>
+        <ol style="margin-left: 20px; margin-top: 10px; line-height: 1.8;">
+          <li>Kopiere das SQL-Statement</li>
+          <li>Öffne Supabase Dashboard → SQL Editor</li>
+          <li>Füge das Statement ein und führe es aus</li>
+          <li>Teste die Zahlung in der App</li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function encryptValue(value) {
+      const key = 'mood-app-encryption-key-v1';
+      let encrypted = '';
+
+      // XOR encryption
+      for (let i = 0; i < value.length; i++) {
+        const charCode = value.charCodeAt(i) ^ key.charCodeAt(i % key.length);
+        encrypted += String.fromCharCode(charCode);
+      }
+
+      // Convert to base64 (fixed version)
+      const bytes = [];
+      for (let i = 0; i < encrypted.length; i++) {
+        bytes.push(encrypted.charCodeAt(i));
+      }
+      const binaryString = String.fromCharCode(...bytes);
+      return btoa(binaryString);
+    }
+
+    document.getElementById('encryptForm').addEventListener('submit', (e) => {
+      e.preventDefault();
+
+      const publishableKey = document.getElementById('publishableKey').value.trim();
+      const secretKey = document.getElementById('secretKey').value.trim();
+
+      if (!publishableKey || !secretKey) {
+        alert('Bitte beide Keys eingeben!');
+        return;
+      }
+
+      if (!publishableKey.startsWith('pk_test_') && !publishableKey.startsWith('pk_live_')) {
+        alert('Publishable Key muss mit pk_test_ oder pk_live_ beginnen!');
+        return;
+      }
+
+      if (!secretKey.startsWith('sk_test_') && !secretKey.startsWith('sk_live_')) {
+        alert('Secret Key muss mit sk_test_ oder sk_live_ beginnen!');
+        return;
+      }
+
+      const encryptedPub = encryptValue(publishableKey);
+      const encryptedSec = encryptValue(secretKey);
+
+      document.getElementById('encryptedPub').value = encryptedPub;
+      document.getElementById('encryptedSec').value = encryptedSec;
+
+      const isTestMode = publishableKey.startsWith('pk_test_');
+
+      const sql = `-- Stripe Keys Update\n` +
+        `UPDATE payment_providers\n` +
+        `SET\n` +
+        `  config = jsonb_build_object(\n` +
+        `    'publishable_key', '${encryptedPub}',\n` +
+        `    'secret_key', '${encryptedSec}',\n` +
+        `    'webhook_secret', 'GgccAU4+PhxkITY2Ni0TLhA5CG9aFzd1Ln1aBDwHXFEjHWIGOg0=',\n` +
+        `    'webhook_url', 'https://apacsqcodgyohiebjhjb.supabase.co/functions/v1/stripe-webhook',\n` +
+        `    'webhook_events', '["checkout.session.completed", "payment_intent.succeeded", "payment_intent.payment_failed"]',\n` +
+        `    'description', 'Stripe payment gateway'\n` +
+        `  ),\n` +
+        `  is_active = true,\n` +
+        `  is_test_mode = ${isTestMode},\n` +
+        `  updated_at = NOW()\n` +
+        `WHERE code = 'stripe';\n\n` +
+        `-- Prüfe Ergebnis\n` +
+        `SELECT\n` +
+        `  'Status: ' ||\n` +
+        `  CASE WHEN is_active THEN '✅ Aktiv' ELSE '❌ Inaktiv' END ||\n` +
+        `  ' | Modus: ' ||\n` +
+        `  CASE WHEN is_test_mode THEN 'Test' ELSE 'Live' END ||\n` +
+        `  ' | Keys: ' || length(config->>'publishable_key') || ' Zeichen' as status\n` +
+        `FROM payment_providers\n` +
+        `WHERE code = 'stripe';`;
+
+      document.getElementById('sqlStatement').textContent = sql;
+      document.getElementById('result').classList.add('show');
+      document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+    });
+
+    function copyToClipboard(elementId) {
+      const element = document.getElementById(elementId);
+      const text = elementId === 'sqlStatement' ? element.textContent : element.value;
+
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = event.target;
+        const originalText = btn.textContent;
+        btn.textContent = '✅ Kopiert!';
+        btn.style.background = '#10b981';
+        setTimeout(() => {
+          btn.textContent = originalText;
+          btn.style.background = '';
+        }, 2000);
+      }).catch(err => {
+        alert('Fehler beim Kopieren: ' + err);
+      });
+    }
+  </script>
+</body>
+</html>
