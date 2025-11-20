@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Menu, X, Plus, Users, BarChart3, Settings as SettingsIcon, Calendar, LogOut, TrendingUp, Shield, User as UserIcon } from 'lucide-react';
+import { Menu, X, Plus, Users, BarChart3, Settings as SettingsIcon, Calendar, LogOut, TrendingUp, Shield, User as UserIcon, Search } from 'lucide-react';
 import { supabase, Pseudonym, MoodIndicator, MoodEntryWithValues } from './lib/supabase';
 import { getCurrentUser, signOut } from './lib/auth';
 import { checkCurrentUserIsAdmin } from './lib/admin';
@@ -46,6 +46,7 @@ export function MoodApp() {
   const [isEntryModalOpen, setIsEntryModalOpen] = useState(false);
   const [editingEntry, setEditingEntry] = useState<MoodEntryWithValues | null>(null);
   const [isAccountSettingsOpen, setIsAccountSettingsOpen] = useState(false);
+  const [indicatorSearchQuery, setIndicatorSearchQuery] = useState('');
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -141,12 +142,14 @@ export function MoodApp() {
         continue;
       }
 
-      const values = (valuesData || []).map((v: any) => ({
-        indicator_id: v.indicator_id,
-        indicator_name: v.mood_indicators.name,
-        indicator_color: v.mood_indicators.color_start || v.mood_indicators.color,
-        value: v.value,
-      }));
+      const values = (valuesData || [])
+        .filter((v: any) => v.mood_indicators !== null)
+        .map((v: any) => ({
+          indicator_id: v.indicator_id,
+          indicator_name: v.mood_indicators.name,
+          indicator_color: v.mood_indicators.color_start || v.mood_indicators.color,
+          value: v.value,
+        }));
 
       entriesWithValues.push({
         ...entry,
@@ -335,6 +338,7 @@ export function MoodApp() {
     setLocation('');
     setCustomTags([]);
     setEditingEntry(null);
+    setIndicatorSearchQuery('');
     setIsSubmitting(false);
     setIsEntryModalOpen(false);
     await loadMoodEntries(selectedPseudonym.id);
@@ -800,6 +804,7 @@ export function MoodApp() {
                   setTemperature(null);
                   setLocation('');
                   setCustomTags([]);
+                  setIndicatorSearchQuery('');
                 }}
                 className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               >
@@ -820,8 +825,36 @@ export function MoodApp() {
                 />
               </div>
 
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Indikatoren suchen
+                </label>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                  <input
+                    type="text"
+                    value={indicatorSearchQuery}
+                    onChange={(e) => setIndicatorSearchQuery(e.target.value)}
+                    placeholder="Nach Indikator-Namen suchen..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  {indicatorSearchQuery && (
+                    <button
+                      onClick={() => setIndicatorSearchQuery('')}
+                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
               <SliderMoodInput
-                indicators={indicators}
+                indicators={indicators.filter((indicator) => {
+                  if (!indicatorSearchQuery.trim()) return true;
+                  const query = indicatorSearchQuery.toLowerCase().trim();
+                  return indicator.name.toLowerCase().includes(query);
+                })}
                 selectedValues={selectedValues}
                 onValueChange={(id, val) =>
                   setSelectedValues((prev) => ({ ...prev, [id]: val }))
@@ -883,6 +916,7 @@ export function MoodApp() {
                     setTemperature(null);
                     setLocation('');
                     setCustomTags([]);
+                    setIndicatorSearchQuery('');
                   }}
                   className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
                 >
