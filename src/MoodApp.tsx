@@ -784,8 +784,8 @@ export function MoodApp() {
 
       {isEntryModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex items-center justify-between">
+          <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] flex flex-col">
+            <div className="flex-shrink-0 bg-white border-b px-6 py-4 flex items-center justify-between">
               <h3 className="text-xl font-bold text-gray-900">
                 {editingEntry ? 'Eintrag bearbeiten' : 'Neuer Eintrag'}
               </h3>
@@ -812,123 +812,131 @@ export function MoodApp() {
               </button>
             </div>
 
-            <div className="p-6 space-y-6">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Zeitpunkt
-                </label>
-                <input
-                  type="datetime-local"
-                  value={entryDate}
-                  onChange={(e) => setEntryDate(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Indikatoren suchen
-                </label>
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                  <input
-                    type="text"
-                    value={indicatorSearchQuery}
-                    onChange={(e) => setIndicatorSearchQuery(e.target.value)}
-                    placeholder="Nach Indikator-Namen suchen..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                  {indicatorSearchQuery && (
-                    <button
-                      onClick={() => setIndicatorSearchQuery('')}
-                      className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              <SliderMoodInput
-                indicators={indicators.filter((indicator) => {
-                  if (!indicatorSearchQuery.trim()) return true;
-                  const query = indicatorSearchQuery.toLowerCase().trim();
-                  return indicator.name.toLowerCase().includes(query);
-                })}
-                selectedValues={selectedValues}
-                onValueChange={(id, val) =>
-                  setSelectedValues((prev) => ({ ...prev, [id]: val }))
-                }
-              />
-
-              {hasSelectedAnyIndicator && (
+            <div className="flex-1 flex flex-col overflow-hidden">
+              <div className="flex-shrink-0 p-6 space-y-6 border-b bg-white">
                 <div>
-                  <label htmlFor="note" className="block text-sm font-medium text-gray-700 mb-2">
-                    Notiz (optional)
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Zeitpunkt
                   </label>
-                  <textarea
-                    id="note"
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    placeholder="Was beschäftigt dich?"
-                    rows={3}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                  <input
+                    type="datetime-local"
+                    value={entryDate}
+                    onChange={(e) => setEntryDate(e.target.value)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
-              )}
 
-              {hasSelectedAnyIndicator && (
-                <MoodEntryMetadata
-                  timeOfDay={timeOfDay}
-                  weather={weather}
-                  weatherCode={weatherCode}
-                  latitude={latitude}
-                  longitude={longitude}
-                  temperature={temperature}
-                  location={location}
-                  customTags={customTags}
-                  onTimeOfDayChange={setTimeOfDay}
-                  onWeatherChange={setWeather}
-                  onWeatherDataChange={(data) => {
-                    setWeatherCode(data.weatherCode);
-                    setLatitude(data.latitude);
-                    setLongitude(data.longitude);
-                    setTemperature(data.temperature);
-                  }}
-                  onLocationChange={setLocation}
-                  onCustomTagsChange={setCustomTags}
+                <div className="sticky top-0 z-10 bg-white pb-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Indikatoren suchen
+                  </label>
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <input
+                      type="text"
+                      value={indicatorSearchQuery}
+                      onChange={(e) => setIndicatorSearchQuery(e.target.value)}
+                      placeholder="Nach Indikator-Namen suchen..."
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    {indicatorSearchQuery && (
+                      <button
+                        onClick={() => setIndicatorSearchQuery('')}
+                        className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-6">
+                <SliderMoodInput
+                  indicators={indicators
+                    .filter((indicator) => {
+                      if (!indicatorSearchQuery.trim()) return true;
+                      const query = indicatorSearchQuery.toLowerCase().trim();
+                      return indicator.name.toLowerCase().includes(query);
+                    })
+                    .sort((a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }))}
+                  selectedValues={selectedValues}
+                  onValueChange={(id, val) =>
+                    setSelectedValues((prev) => ({ ...prev, [id]: val }))
+                  }
                 />
-              )}
+              </div>
 
-              <div className="flex gap-3 pt-4 border-t">
-                <button
-                  onClick={() => {
-                    setIsEntryModalOpen(false);
-                    setEditingEntry(null);
-                    setSelectedValues({});
-                    setNote('');
-                    setEntryDate(new Date().toISOString().slice(0, 16));
-                    setTimeOfDay('');
-                    setWeather('');
-                    setWeatherCode(null);
-                    setLatitude(null);
-                    setLongitude(null);
-                    setTemperature(null);
-                    setLocation('');
-                    setCustomTags([]);
-                    setIndicatorSearchQuery('');
-                  }}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Abbrechen
-                </button>
-                <button
-                  onClick={handleSubmitMoodEntry}
-                  disabled={isSubmitting || !hasSelectedAnyIndicator}
-                  className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-teal-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-teal-700 disabled:opacity-50 transition-colors shadow-lg"
-                >
-                  {isSubmitting ? 'Wird gespeichert...' : editingEntry ? 'Aktualisieren' : 'Speichern'}
-                </button>
+              <div className="flex-shrink-0 overflow-y-auto p-6 space-y-6 border-t bg-white max-h-[40vh]">
+                {hasSelectedAnyIndicator && (
+                  <div>
+                    <label htmlFor="note" className="block text-sm font-medium text-gray-700 mb-2">
+                      Notiz (optional)
+                    </label>
+                    <textarea
+                      id="note"
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      placeholder="Was beschäftigt dich?"
+                      rows={3}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 resize-none"
+                    />
+                  </div>
+                )}
+
+                {hasSelectedAnyIndicator && (
+                  <MoodEntryMetadata
+                    timeOfDay={timeOfDay}
+                    weather={weather}
+                    weatherCode={weatherCode}
+                    latitude={latitude}
+                    longitude={longitude}
+                    temperature={temperature}
+                    location={location}
+                    customTags={customTags}
+                    onTimeOfDayChange={setTimeOfDay}
+                    onWeatherChange={setWeather}
+                    onWeatherDataChange={(data) => {
+                      setWeatherCode(data.weatherCode);
+                      setLatitude(data.latitude);
+                      setLongitude(data.longitude);
+                      setTemperature(data.temperature);
+                    }}
+                    onLocationChange={setLocation}
+                    onCustomTagsChange={setCustomTags}
+                  />
+                )}
+
+                <div className="flex gap-3 pt-4 border-t">
+                  <button
+                    onClick={() => {
+                      setIsEntryModalOpen(false);
+                      setEditingEntry(null);
+                      setSelectedValues({});
+                      setNote('');
+                      setEntryDate(new Date().toISOString().slice(0, 16));
+                      setTimeOfDay('');
+                      setWeather('');
+                      setWeatherCode(null);
+                      setLatitude(null);
+                      setLongitude(null);
+                      setTemperature(null);
+                      setLocation('');
+                      setCustomTags([]);
+                      setIndicatorSearchQuery('');
+                    }}
+                    className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 font-semibold rounded-lg hover:bg-gray-50 transition-colors"
+                  >
+                    Abbrechen
+                  </button>
+                  <button
+                    onClick={handleSubmitMoodEntry}
+                    disabled={isSubmitting || !hasSelectedAnyIndicator}
+                    className="flex-1 px-6 py-3 bg-gradient-to-r from-blue-600 to-teal-600 text-white font-semibold rounded-lg hover:from-blue-700 hover:to-teal-700 disabled:opacity-50 transition-colors shadow-lg"
+                  >
+                    {isSubmitting ? 'Wird gespeichert...' : editingEntry ? 'Aktualisieren' : 'Speichern'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>

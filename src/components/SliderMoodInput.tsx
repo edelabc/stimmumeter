@@ -11,7 +11,9 @@ export function SliderMoodInput({
   selectedValues,
   onValueChange,
 }: SliderMoodInputProps) {
-  const activeIndicators = indicators.filter((i) => i.is_active);
+  const activeIndicators = indicators
+    .filter((i) => i.is_active)
+    .sort((a, b) => a.name.localeCompare(b.name, 'de', { sensitivity: 'base' }));
 
   if (activeIndicators.length === 0) {
     return (
