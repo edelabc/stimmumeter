@@ -41,7 +41,10 @@ export function MasterDataSettings({
   const loadIndicators = async () => {
     const { data, error } = await supabase
       .from('mood_indicators')
-      .select('*')
+      .select(`
+        *,
+        category:indicator_categories(*)
+      `)
       .or(`user_id.eq.${userId},user_id.is.null`)
       .order('sort_order', { ascending: true });
 
@@ -461,11 +464,16 @@ export function MasterDataSettings({
                     />
                   )}
                   <div className="flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="font-semibold text-gray-900">{indicator.name}</h4>
                       {isDefault && (
                         <span className="text-xs px-2 py-1 bg-blue-200 text-blue-800 rounded-full">
                           Standard
+                        </span>
+                      )}
+                      {indicator.category && (
+                        <span className="text-xs px-2 py-1 bg-purple-200 text-purple-800 rounded-full">
+                          {indicator.category.name}
                         </span>
                       )}
                     </div>

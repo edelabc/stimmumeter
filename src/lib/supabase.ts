@@ -35,6 +35,14 @@ export interface Pseudonym {
   language?: string | null;
 }
 
+export interface IndicatorCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface MoodIndicator {
   id: string;
   name: string;
@@ -49,6 +57,8 @@ export interface MoodIndicator {
   color_end: string;
   user_id: string | null;
   icon_url?: string | null;
+  category_id?: string | null;
+  category?: IndicatorCategory | null;
 }
 
 export interface MoodEntry {

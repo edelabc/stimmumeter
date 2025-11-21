@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
-import { Settings, Plus, Trash2, CreditCard as Edit2, Save, X, Upload, Lock, Unlock, Search } from 'lucide-react';
-import { supabase, MoodIndicator } from '../../lib/supabase';
+import { Settings, Plus, Trash2, CreditCard as Edit2, Save, X, Upload, Lock, Unlock, Search, Tag } from 'lucide-react';
+import { supabase, MoodIndicator, IndicatorCategory } from '../../lib/supabase';
+
+type TabType = 'indicators' | 'categories';
 
 export function StandardIndicatorsManagement() {
+  const [activeTab, setActiveTab] = useState<TabType>('indicators');
   const [indicators, setIndicators] = useState<MoodIndicator[]>([]);
+  const [categories, setCategories] = useState<IndicatorCategory[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     name: '',
     min_value: 0,
@@ -14,6 +19,11 @@ export function StandardIndicatorsManagement() {
     color_start: '#ef4444',
     color_end: '#10b981',
     icon_url: null as string | null,
+    category_id: null as string | null,
+  });
+  const [categoryFormData, setCategoryFormData] = useState({
+    name: '',
+    description: '',
   });
   const [uploadingIcon, setUploadingIcon] = useState(false);
   const [iconPreview, setIconPreview] = useState<string | null>(null);
@@ -21,12 +31,16 @@ export function StandardIndicatorsManagement() {
 
   useEffect(() => {
     loadIndicators();
+    loadCategories();
   }, []);
 
   const loadIndicators = async () => {
     const { data, error } = await supabase
       .from('mood_indicators')
-      .select('*')
+      .select(`
+        *,
+        category:indicator_categories(*)
+      `)
       .is('user_id', null)
       .order('name', { ascending: true });
 
@@ -36,6 +50,20 @@ export function StandardIndicatorsManagement() {
     }
 
     setIndicators(data || []);
+  };
+
+  const loadCategories = async () => {
+    const { data, error } = await supabase
+      .from('indicator_categories')
+      .select('*')
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('Error loading categories:', error);
+      return;
+    }
+
+    setCategories(data || []);
   };
 
   const filteredIndicators = indicators.filter((indicator) =>
@@ -95,7 +123,6 @@ export function StandardIndicatorsManagement() {
 
     const trimmedName = formData.name.trim();
     
-    // Prüfe, ob ein Standard-Indikator mit diesem Namen bereits existiert
     const existingIndicator = indicators.find(
       (ind) => ind.name.toLowerCase().trim() === trimmedName.toLowerCase()
     );
@@ -135,7 +162,6 @@ export function StandardIndicatorsManagement() {
   const handleUpdate = async (id: string) => {
     const trimmedName = formData.name.trim();
     
-    // Prüfe, ob ein anderer Standard-Indikator mit diesem Namen bereits existiert
     const existingIndicator = indicators.find(
       (ind) => ind.id !== id && ind.name.toLowerCase().trim() === trimmedName.toLowerCase()
     );
@@ -204,6 +230,73 @@ export function StandardIndicatorsManagement() {
     await loadIndicators();
   };
 
+  const handleCategoryCreate = async () => {
+    if (!categoryFormData.name.trim()) return;
+
+    const { error } = await supabase
+      .from('indicator_categories')
+      .insert([{
+        name: categoryFormData.name.trim(),
+        description: categoryFormData.description.trim() || null,
+      }]);
+
+    if (error) {
+      console.error('Error creating category:', error);
+      if (error.code === '23505') {
+        alert('Eine Kategorie mit diesem Namen existiert bereits.');
+      } else {
+        alert('Fehler: ' + error.message);
+      }
+      return;
+    }
+
+    resetCategoryForm();
+    await loadCategories();
+  };
+
+  const handleCategoryUpdate = async (id: string) => {
+    const { error } = await supabase
+      .from('indicator_categories')
+      .update({
+        name: categoryFormData.name.trim(),
+        description: categoryFormData.description.trim() || null,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating category:', error);
+      if (error.code === '23505') {
+        alert('Eine Kategorie mit diesem Namen existiert bereits.');
+      } else {
+        alert('Fehler: ' + error.message);
+      }
+      return;
+    }
+
+    setEditingCategoryId(null);
+    resetCategoryForm();
+    await loadCategories();
+  };
+
+  const handleCategoryDelete = async (id: string) => {
+    if (!confirm('Kategorie löschen? Indikatoren mit dieser Kategorie werden nicht gelöscht, aber die Zuordnung wird entfernt.')) return;
+
+    const { error } = await supabase
+      .from('indicator_categories')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting category:', error);
+      alert('Fehler: ' + error.message);
+      return;
+    }
+
+    await loadCategories();
+    await loadIndicators();
+  };
+
   const startEdit = (indicator: MoodIndicator) => {
     setEditingId(indicator.id);
     setFormData({
@@ -214,8 +307,17 @@ export function StandardIndicatorsManagement() {
       color_start: indicator.color_start,
       color_end: indicator.color_end,
       icon_url: indicator.icon_url || null,
+      category_id: indicator.category_id || null,
     });
     setIconPreview(indicator.icon_url || null);
+  };
+
+  const startCategoryEdit = (category: IndicatorCategory) => {
+    setEditingCategoryId(category.id);
+    setCategoryFormData({
+      name: category.name,
+      description: category.description || '',
+    });
   };
 
   const resetForm = () => {
@@ -227,9 +329,18 @@ export function StandardIndicatorsManagement() {
       color_start: '#ef4444',
       color_end: '#10b981',
       icon_url: null,
+      category_id: null,
     });
     setEditingId(null);
     setIconPreview(null);
+  };
+
+  const resetCategoryForm = () => {
+    setCategoryFormData({
+      name: '',
+      description: '',
+    });
+    setEditingCategoryId(null);
   };
 
   return (
@@ -241,275 +352,433 @@ export function StandardIndicatorsManagement() {
         </div>
       </div>
 
-      <div className="bg-gradient-to-r from-blue-50 to-teal-50 rounded-xl p-6 mb-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">
-          {editingId ? 'Indikator bearbeiten' : 'Neuer Standard-Indikator'}
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Indikator Name
-            </label>
-            <input
-              type="text"
-              value={formData.name}
-              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-              placeholder="z.B. Freundlichkeit, Energie..."
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Mindestwert
-            </label>
-            <input
-              type="number"
-              value={formData.min_value}
-              onChange={(e) => setFormData({ ...formData, min_value: Number(e.target.value) })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Höchstwert
-            </label>
-            <input
-              type="number"
-              value={formData.max_value}
-              onChange={(e) => setFormData({ ...formData, max_value: Number(e.target.value) })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Schrittweite
-            </label>
-            <input
-              type="number"
-              step="0.1"
-              value={formData.step_value}
-              onChange={(e) => setFormData({ ...formData, step_value: Number(e.target.value) })}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Farbe (Start/Niedrig)
-            </label>
-            <input
-              type="color"
-              value={formData.color_start}
-              onChange={(e) => setFormData({ ...formData, color_start: e.target.value })}
-              className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Farbe (Ende/Hoch)
-            </label>
-            <input
-              type="color"
-              value={formData.color_end}
-              onChange={(e) => setFormData({ ...formData, color_end: e.target.value })}
-              className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
-            />
-          </div>
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Icon (optional)
-            </label>
-            <div className="flex items-center gap-4">
-              {iconPreview && (
-                <div className="w-16 h-16 border-2 border-gray-300 rounded-lg flex items-center justify-center bg-white">
-                  <img src={iconPreview} alt="Icon Preview" className="w-12 h-12 object-contain" />
+      {/* Tab Navigation */}
+      <div className="flex gap-2 border-b">
+        <button
+          onClick={() => setActiveTab('indicators')}
+          className={`px-4 py-2 font-medium transition-colors ${
+            activeTab === 'indicators'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          Indikatoren
+        </button>
+        <button
+          onClick={() => setActiveTab('categories')}
+          className={`px-4 py-2 font-medium transition-colors flex items-center gap-2 ${
+            activeTab === 'categories'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-600 hover:text-gray-900'
+          }`}
+        >
+          <Tag size={18} />
+          Kategorien
+        </button>
+      </div>
+
+      {/* Indikatoren Tab */}
+      {activeTab === 'indicators' && (
+        <>
+          <div className="bg-gradient-to-r from-blue-50 to-teal-50 rounded-xl p-6 mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              {editingId ? 'Indikator bearbeiten' : 'Neuer Standard-Indikator'}
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Indikator Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                  placeholder="z.B. Freundlichkeit, Energie..."
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Kategorie
+                </label>
+                <select
+                  value={formData.category_id || ''}
+                  onChange={(e) => setFormData({ ...formData, category_id: e.target.value || null })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Keine Kategorie</option>
+                  {categories.map((cat) => (
+                    <option key={cat.id} value={cat.id}>
+                      {cat.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Mindestwert
+                </label>
+                <input
+                  type="number"
+                  value={formData.min_value}
+                  onChange={(e) => setFormData({ ...formData, min_value: Number(e.target.value) })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Höchstwert
+                </label>
+                <input
+                  type="number"
+                  value={formData.max_value}
+                  onChange={(e) => setFormData({ ...formData, max_value: Number(e.target.value) })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Schrittweite
+                </label>
+                <input
+                  type="number"
+                  step="0.1"
+                  value={formData.step_value}
+                  onChange={(e) => setFormData({ ...formData, step_value: Number(e.target.value) })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Farbe (Start/Niedrig)
+                </label>
+                <input
+                  type="color"
+                  value={formData.color_start}
+                  onChange={(e) => setFormData({ ...formData, color_start: e.target.value })}
+                  className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Farbe (Ende/Hoch)
+                </label>
+                <input
+                  type="color"
+                  value={formData.color_end}
+                  onChange={(e) => setFormData({ ...formData, color_end: e.target.value })}
+                  className="w-full h-10 border border-gray-300 rounded-lg cursor-pointer"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Icon (optional)
+                </label>
+                <div className="flex items-center gap-4">
+                  {iconPreview && (
+                    <div className="w-16 h-16 border-2 border-gray-300 rounded-lg flex items-center justify-center bg-white">
+                      <img src={iconPreview} alt="Icon Preview" className="w-12 h-12 object-contain" />
+                    </div>
+                  )}
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/svg+xml"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleIconUpload(file);
+                    }}
+                    className="hidden"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploadingIcon}
+                    className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors disabled:opacity-50"
+                  >
+                    {uploadingIcon ? (
+                      <>
+                        <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                        Wird hochgeladen...
+                      </>
+                    ) : (
+                      <>
+                        <Upload size={18} />
+                        Icon hochladen
+                      </>
+                    )}
+                  </button>
+                  {iconPreview && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFormData({ ...formData, icon_url: null });
+                        setIconPreview(null);
+                      }}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                      title="Icon entfernen"
+                    >
+                      <X size={18} />
+                    </button>
+                  )}
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  JPG, PNG oder SVG · Max. 2MB · Wird automatisch auf 128x128px skaliert
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-3">
+              {editingId ? (
+                <>
+                  <button
+                    onClick={() => handleUpdate(editingId)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    <Save size={18} />
+                    Speichern
+                  </button>
+                  <button
+                    onClick={resetForm}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                  >
+                    <X size={18} />
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleCreate}
+                  disabled={!formData.name.trim()}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-lg hover:from-blue-700 hover:to-teal-700 disabled:opacity-50"
+                >
+                  <Plus size={18} />
+                  Erstellen
+                </button>
               )}
+            </div>
+          </div>
+
+          <div className="mb-4">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Indikatoren suchen
+            </label>
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
               <input
-                ref={fileInputRef}
-                type="file"
-                accept="image/jpeg,image/png,image/svg+xml"
-                onChange={(e) => {
-                  const file = e.target.files?.[0];
-                  if (file) handleIconUpload(file);
-                }}
-                className="hidden"
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Nach Indikator-Namen suchen..."
+                className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploadingIcon}
-                className="flex items-center gap-2 px-4 py-2 border-2 border-dashed border-gray-300 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors disabled:opacity-50"
-              >
-                {uploadingIcon ? (
+              {searchQuery && (
+                <button
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3 max-h-96 overflow-y-auto">
+            {filteredIndicators.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                {indicators.length === 0 ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
-                    Wird hochgeladen...
+                    <p className="mb-2">Noch keine Standard-Indikatoren vorhanden</p>
+                    <p className="text-sm">Erstelle deinen ersten Standard-Indikator oben</p>
                   </>
                 ) : (
                   <>
-                    <Upload size={18} />
-                    Icon hochladen
+                    <p className="mb-2">Keine Indikatoren gefunden</p>
+                    <p className="text-sm">Versuche einen anderen Suchbegriff</p>
                   </>
                 )}
-              </button>
-              {iconPreview && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setFormData({ ...formData, icon_url: null });
-                    setIconPreview(null);
-                  }}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                  title="Icon entfernen"
-                >
-                  <X size={18} />
-                </button>
-              )}
-            </div>
-            <p className="text-xs text-gray-500 mt-2">
-              JPG, PNG oder SVG · Max. 2MB · Wird automatisch auf 128x128px skaliert
-            </p>
-          </div>
-        </div>
-        <div className="flex gap-3">
-          {editingId ? (
-            <>
-              <button
-                onClick={() => handleUpdate(editingId)}
-                className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                <Save size={18} />
-                Speichern
-              </button>
-              <button
-                onClick={resetForm}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
-              >
-                <X size={18} />
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={handleCreate}
-              disabled={!formData.name.trim()}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-600 to-teal-600 text-white rounded-lg hover:from-blue-700 hover:to-teal-700 disabled:opacity-50"
-            >
-              <Plus size={18} />
-              Erstellen
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="mb-4">
-        <label className="block text-sm font-medium text-gray-700 mb-2">
-          Indikatoren suchen
-        </label>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Nach Indikator-Namen suchen..."
-            className="w-full pl-10 pr-10 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="space-y-3 max-h-96 overflow-y-auto">
-        {filteredIndicators.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            {indicators.length === 0 ? (
-              <>
-                <p className="mb-2">Noch keine Standard-Indikatoren vorhanden</p>
-                <p className="text-sm">Erstelle deinen ersten Standard-Indikator oben</p>
-              </>
+              </div>
             ) : (
-              <>
-                <p className="mb-2">Keine Indikatoren gefunden</p>
-                <p className="text-sm">Versuche einen anderen Suchbegriff</p>
-              </>
+              filteredIndicators.map((indicator) => {
+                const category = indicator.category || (categories.find(c => c.id === indicator.category_id));
+                return (
+                  <div
+                    key={indicator.id}
+                    className={`flex items-center gap-4 p-4 border-2 rounded-lg ${
+                      indicator.is_active
+                        ? 'bg-white border-gray-200 hover:border-gray-300'
+                        : 'bg-gray-100 border-gray-300 opacity-60'
+                    }`}
+                  >
+                    {indicator.icon_url ? (
+                      <div className="w-12 h-12 flex items-center justify-center bg-white rounded-lg border-2 border-gray-200">
+                        <img src={indicator.icon_url} alt={indicator.name} className="w-10 h-10 object-contain" />
+                      </div>
+                    ) : (
+                      <div
+                        className="w-8 h-8 rounded-lg"
+                        style={{
+                          background: `linear-gradient(to right, ${indicator.color_start}, ${indicator.color_end})`,
+                        }}
+                      />
+                    )}
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h4 className="font-semibold text-gray-900">{indicator.name}</h4>
+                        <span className="text-xs px-2 py-1 bg-blue-200 text-blue-800 rounded-full">
+                          Standard
+                        </span>
+                        {category && (
+                          <span className="text-xs px-2 py-1 bg-purple-200 text-purple-800 rounded-full">
+                            {category.name}
+                          </span>
+                        )}
+                        {!indicator.is_active && (
+                          <span className="text-xs px-2 py-1 bg-red-200 text-red-800 rounded-full">
+                            Gesperrt
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600">
+                        {indicator.min_value} - {indicator.max_value} (Schritt: {indicator.step_value})
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleToggleActive(indicator.id, indicator.is_active)}
+                        className={`p-2 rounded-lg transition-colors ${
+                          indicator.is_active
+                            ? 'text-yellow-600 hover:bg-yellow-50'
+                            : 'text-green-600 hover:bg-green-50'
+                        }`}
+                        title={indicator.is_active ? 'Sperren' : 'Entsperren'}
+                      >
+                        {indicator.is_active ? <Lock size={18} /> : <Unlock size={18} />}
+                      </button>
+                      <button
+                        onClick={() => startEdit(indicator)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                        title="Bearbeiten"
+                      >
+                        <Edit2 size={18} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(indicator.id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                        title="Löschen"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
-        ) : (
-          filteredIndicators.map((indicator) => (
-            <div
-              key={indicator.id}
-              className={`flex items-center gap-4 p-4 border-2 rounded-lg ${
-                indicator.is_active
-                  ? 'bg-white border-gray-200 hover:border-gray-300'
-                  : 'bg-gray-100 border-gray-300 opacity-60'
-              }`}
-            >
-              {indicator.icon_url ? (
-                <div className="w-12 h-12 flex items-center justify-center bg-white rounded-lg border-2 border-gray-200">
-                  <img src={indicator.icon_url} alt={indicator.name} className="w-10 h-10 object-contain" />
-                </div>
-              ) : (
-                <div
-                  className="w-8 h-8 rounded-lg"
-                  style={{
-                    background: `linear-gradient(to right, ${indicator.color_start}, ${indicator.color_end})`,
-                  }}
+        </>
+      )}
+
+      {/* Kategorien Tab */}
+      {activeTab === 'categories' && (
+        <>
+          <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-6 mb-6">
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">
+              {editingCategoryId ? 'Kategorie bearbeiten' : 'Neue Kategorie'}
+            </h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Kategorie Name
+                </label>
+                <input
+                  type="text"
+                  value={categoryFormData.name}
+                  onChange={(e) => setCategoryFormData({ ...categoryFormData, name: e.target.value })}
+                  placeholder="z.B. Positive Stimmung (VALENZ POSITIV)"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                 />
-              )}
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <h4 className="font-semibold text-gray-900">{indicator.name}</h4>
-                  <span className="text-xs px-2 py-1 bg-blue-200 text-blue-800 rounded-full">
-                    Standard
-                  </span>
-                  {!indicator.is_active && (
-                    <span className="text-xs px-2 py-1 bg-red-200 text-red-800 rounded-full">
-                      Gesperrt
-                    </span>
-                  )}
-                </div>
-                <p className="text-sm text-gray-600">
-                  {indicator.min_value} - {indicator.max_value} (Schritt: {indicator.step_value})
-                </p>
               </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => handleToggleActive(indicator.id, indicator.is_active)}
-                  className={`p-2 rounded-lg transition-colors ${
-                    indicator.is_active
-                      ? 'text-yellow-600 hover:bg-yellow-50'
-                      : 'text-green-600 hover:bg-green-50'
-                  }`}
-                  title={indicator.is_active ? 'Sperren' : 'Entsperren'}
-                >
-                  {indicator.is_active ? <Lock size={18} /> : <Unlock size={18} />}
-                </button>
-                <button
-                  onClick={() => startEdit(indicator)}
-                  className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                  title="Bearbeiten"
-                >
-                  <Edit2 size={18} />
-                </button>
-                <button
-                  onClick={() => handleDelete(indicator.id)}
-                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
-                  title="Löschen"
-                >
-                  <Trash2 size={18} />
-                </button>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Beschreibung
+                </label>
+                <textarea
+                  value={categoryFormData.description}
+                  onChange={(e) => setCategoryFormData({ ...categoryFormData, description: e.target.value })}
+                  placeholder="Beschreibung der Kategorie..."
+                  rows={3}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
               </div>
             </div>
-          ))
-        )}
-      </div>
+            <div className="flex gap-3 mt-4">
+              {editingCategoryId ? (
+                <>
+                  <button
+                    onClick={() => handleCategoryUpdate(editingCategoryId)}
+                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  >
+                    <Save size={18} />
+                    Speichern
+                  </button>
+                  <button
+                    onClick={resetCategoryForm}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                  >
+                    <X size={18} />
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={handleCategoryCreate}
+                  disabled={!categoryFormData.name.trim()}
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-gradient-to-r from-purple-600 to-pink-600 text-white rounded-lg hover:from-purple-700 hover:to-pink-700 disabled:opacity-50"
+                >
+                  <Plus size={18} />
+                  Erstellen
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {categories.length === 0 ? (
+              <div className="text-center py-8 text-gray-500">
+                <p className="mb-2">Noch keine Kategorien vorhanden</p>
+                <p className="text-sm">Erstelle deine erste Kategorie oben</p>
+              </div>
+            ) : (
+              categories.map((category) => (
+                <div
+                  key={category.id}
+                  className="flex items-start gap-4 p-4 border-2 border-gray-200 rounded-lg bg-white hover:border-gray-300"
+                >
+                  <div className="flex-1">
+                    <h4 className="font-semibold text-gray-900 mb-1">{category.name}</h4>
+                    {category.description && (
+                      <p className="text-sm text-gray-600">{category.description}</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => startCategoryEdit(category)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                      title="Bearbeiten"
+                    >
+                      <Edit2 size={18} />
+                    </button>
+                    <button
+                      onClick={() => handleCategoryDelete(category.id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg"
+                      title="Löschen"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
-
