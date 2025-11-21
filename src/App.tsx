@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { getCurrentUser, signOut } from './lib/auth';
 import { AuthForm } from './components/AuthForm';
 import { LandingPage } from './components/LandingPage';
+import { LandingPageRedesign } from './components/LandingPageRedesign';
+import { InteractiveEarth } from './components/InteractiveEarth';
+import { QuestionsFirst } from './components/QuestionsFirst';
 import { Layout } from './components/Layout';
 import { SEO } from './components/SEO';
 import { LegalPageViewer } from './components/LegalPageViewer';
@@ -14,7 +17,7 @@ import { PaymentCancel } from './components/PaymentCancel';
 import { CookieConsent } from './components/CookieConsent';
 import { supabase } from './lib/supabase';
 
-type Route = 'landing' | 'auth' | 'app' | 'admin' | 'legal' | 'docs' | 'agreement' | 'payment-success' | 'payment-cancel';
+type Route = 'landing' | 'landing-old' | 'interactive-earth' | 'questions-first' | 'auth' | 'app' | 'admin' | 'legal' | 'docs' | 'agreement' | 'payment-success' | 'payment-cancel';
 
 interface AppState {
   route: Route;
@@ -36,22 +39,26 @@ function App() {
   const checkUser = async () => {
     const currentUser = await getCurrentUser();
 
-    // Check if user is blocked
-    if (currentUser) {
-      const { data: profile } = await supabase
-        .from('user_profiles')
-        .select('is_blocked')
-        .eq('id', currentUser.id)
-        .maybeSingle();
+    // Check if user is blocked (nur wenn Supabase verfügbar)
+    if (currentUser && supabase) {
+      try {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('is_blocked')
+          .eq('id', currentUser.id)
+          .maybeSingle();
 
-      if (profile?.is_blocked) {
-        // Log out blocked user
-        await signOut();
-        setUser(null);
-        setAppState({ route: 'auth' });
-        alert('Ihr Account wurde gesperrt. Bitte kontaktieren Sie den Administrator.');
-        setLoading(false);
-        return;
+        if (profile?.is_blocked) {
+          // Log out blocked user
+          await signOut();
+          setUser(null);
+          setAppState({ route: 'auth' });
+          alert('Ihr Account wurde gesperrt. Bitte kontaktieren Sie den Administrator.');
+          setLoading(false);
+          return;
+        }
+      } catch (error) {
+        console.warn('Fehler beim Prüfen des User-Status:', error);
       }
     }
 
@@ -81,6 +88,12 @@ function App() {
       setAppState({ route: 'app' });
     } else if (path === '/auth') {
       setAppState({ route: 'auth' });
+    } else if (path === '/landing-old' || path === '/startseite-alt') {
+      setAppState({ route: 'landing-old' });
+    } else if (path === '/interactive-earth' || path === '/interaktive-erde') {
+      setAppState({ route: 'interactive-earth' });
+    } else if (path === '/questions-first' || path === '/fragen-zuerst') {
+      setAppState({ route: 'questions-first' });
     } else {
       setAppState({ route: 'landing' });
     }
@@ -108,6 +121,12 @@ function App() {
       setAppState({ route: 'app' });
     } else if (url === '/auth') {
       setAppState({ route: 'auth' });
+    } else if (url === '/landing-old' || url === '/startseite-alt') {
+      setAppState({ route: 'landing-old' });
+    } else if (url === '/interactive-earth' || url === '/interaktive-erde') {
+      setAppState({ route: 'interactive-earth' });
+    } else if (url === '/questions-first' || url === '/fragen-zuerst') {
+      setAppState({ route: 'questions-first' });
     } else {
       setAppState({ route: 'landing' });
     }
@@ -228,13 +247,70 @@ function App() {
     );
   }
 
+  // Neue Landing Page mit 3D-Globus (Standard)
+  if (appState.route === 'landing') {
+    return (
+      <>
+        <SEO />
+        <CookieConsent onNavigate={navigate} />
+        <LandingPageRedesign 
+          onGetStarted={handleGetStarted}
+          onNavigateToOld={() => navigate('/landing-old')}
+        />
+      </>
+    );
+  }
+
+  // Alte Landing Page (verfügbar über /landing-old oder /startseite-alt)
+  if (appState.route === 'landing-old') {
+    return (
+      <>
+        <SEO title="Startseite (Klassisch)" />
+        <CookieConsent onNavigate={navigate} />
+        <Layout onNavigate={navigate}>
+          <LandingPage 
+            onGetStarted={handleGetStarted}
+            onNavigateToNew={() => navigate('/')}
+          />
+        </Layout>
+      </>
+    );
+  }
+
+  // Interactive Earth Page
+  if (appState.route === 'interactive-earth') {
+    return (
+      <>
+        <SEO title="Interaktive Erde - WAMELI" />
+        {/* CookieConsent nur wenn Supabase konfiguriert */}
+        {import.meta.env.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes('xxxxxxxxxxxxx') && (
+          <CookieConsent onNavigate={navigate} />
+        )}
+        <InteractiveEarth onNavigate={navigate} />
+      </>
+    );
+  }
+
+  // Questions First Page
+  if (appState.route === 'questions-first') {
+    return (
+      <>
+        <SEO title="Wie tickt die Welt? - WAMELI" />
+        {/* CookieConsent nur wenn Supabase konfiguriert */}
+        {import.meta.env.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes('xxxxxxxxxxxxx') && (
+          <CookieConsent onNavigate={navigate} />
+        )}
+        <QuestionsFirst onNavigate={navigate} />
+      </>
+    );
+  }
+
+  // Fallback (sollte nicht erreicht werden)
   return (
     <>
       <SEO />
       <CookieConsent onNavigate={navigate} />
-      <Layout onNavigate={navigate}>
-        <LandingPage onGetStarted={handleGetStarted} />
-      </Layout>
+      <LandingPageRedesign onGetStarted={handleGetStarted} />
     </>
   );
 }

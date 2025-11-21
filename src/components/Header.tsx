@@ -24,6 +24,8 @@ export function Header({ onNavigate }: HeaderProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
+    if (!supabase) return; // Supabase nicht verfügbar
+    
     loadMenuItems();
     loadSiteSettings();
     checkAuthStatus();
@@ -39,54 +41,72 @@ export function Header({ onNavigate }: HeaderProps) {
   }, []);
 
   const checkAuthStatus = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    setIsLoggedIn(!!session);
+    if (!supabase) return;
+    
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      setIsLoggedIn(!!session);
+    } catch (error) {
+      console.warn('Fehler beim Prüfen des Auth-Status:', error);
+    }
   };
 
   const loadMenuItems = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    const isAuthenticated = !!session;
+    if (!supabase) return;
     
-    // Check if user is admin
-    let isAdmin = false;
-    if (isAuthenticated && session?.user) {
-      const { data: adminCheck } = await supabase
-        .from('admin_users')
-        .select('user_id')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-      isAdmin = !!adminCheck;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const isAuthenticated = !!session;
+      
+      // Check if user is admin
+      let isAdmin = false;
+      if (isAuthenticated && session?.user) {
+        const { data: adminCheck } = await supabase
+          .from('admin_users')
+          .select('user_id')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+        isAdmin = !!adminCheck;
+      }
+
+      // Build query based on role
+      let query = supabase
+        .from('menu_items')
+        .select('*')
+        .eq('is_active', true)
+        .order('position');
+
+      // Filter by required_role
+      if (!isAuthenticated) {
+        // Public users can only see public items
+        query = query.eq('required_role', 'public');
+      } else if (!isAdmin) {
+        // Authenticated non-admin users can see public and user items
+        query = query.in('required_role', ['public', 'user']);
+      }
+      // Admins can see all items (no filter)
+
+      const { data } = await query;
+
+      if (data) setMenuItems(data);
+    } catch (error) {
+      console.warn('Fehler beim Laden der Menu-Items:', error);
     }
-
-    // Build query based on role
-    let query = supabase
-      .from('menu_items')
-      .select('*')
-      .eq('is_active', true)
-      .order('position');
-
-    // Filter by required_role
-    if (!isAuthenticated) {
-      // Public users can only see public items
-      query = query.eq('required_role', 'public');
-    } else if (!isAdmin) {
-      // Authenticated non-admin users can see public and user items
-      query = query.in('required_role', ['public', 'user']);
-    }
-    // Admins can see all items (no filter)
-
-    const { data } = await query;
-
-    if (data) setMenuItems(data);
   };
 
   const loadSiteSettings = async () => {
-    const { data } = await supabase
-      .from('site_settings')
-      .select('site_name')
-      .single();
+    if (!supabase) return;
+    
+    try {
+      const { data } = await supabase
+        .from('site_settings')
+        .select('site_name')
+        .single();
 
-    if (data) setSiteName(data.site_name);
+      if (data) setSiteName(data.site_name);
+    } catch (error) {
+      console.warn('Fehler beim Laden der Site-Settings:', error);
+    }
   };
 
   const handleNavigate = (url: string) => {

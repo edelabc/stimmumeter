@@ -9,9 +9,10 @@ interface SiteSettings {
 
 interface LandingPageProps {
   onGetStarted: () => void;
+  onNavigateToNew?: () => void;
 }
 
-export function LandingPage({ onGetStarted }: LandingPageProps) {
+export function LandingPage({ onGetStarted, onNavigateToNew }: LandingPageProps) {
   const [settings, setSettings] = useState<SiteSettings>({
     site_name: 'Stimmungs-Tracker',
     site_description: 'Verfolge deine Stimmung und finde Muster in deinem emotionalen Wohlbefinden'
@@ -22,12 +23,18 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
   }, []);
 
   const loadSettings = async () => {
-    const { data } = await supabase
-      .from('site_settings')
-      .select('site_name, site_description')
-      .single();
+    if (!supabase) return; // Supabase nicht verfügbar
+    
+    try {
+      const { data } = await supabase
+        .from('site_settings')
+        .select('site_name, site_description')
+        .single();
 
-    if (data) setSettings(data);
+      if (data) setSettings(data);
+    } catch (error) {
+      console.warn('Fehler beim Laden der Site-Settings:', error);
+    }
   };
 
   return (
@@ -142,13 +149,39 @@ export function LandingPage({ onGetStarted }: LandingPageProps) {
           <p className="text-xl mb-10 opacity-90">
             Starte jetzt und nimm dein Wohlbefinden in die Hand!
           </p>
-          <button
-            onClick={onGetStarted}
-            className="group inline-flex items-center gap-3 bg-white text-blue-600 px-8 py-4 rounded-full font-bold text-lg hover:bg-gray-100 transition-all shadow-xl hover:shadow-2xl transform hover:scale-105"
-          >
-            Jetzt loslegen
-            <ArrowRight className="group-hover:translate-x-1 transition-transform" size={24} />
-          </button>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <button
+              onClick={onGetStarted}
+              className="group inline-flex items-center gap-3 bg-white text-blue-600 px-8 py-4 rounded-full font-bold text-lg hover:bg-gray-100 transition-all shadow-xl hover:shadow-2xl transform hover:scale-105"
+            >
+              Jetzt loslegen
+              <ArrowRight className="group-hover:translate-x-1 transition-transform" size={24} />
+            </button>
+            {onNavigateToNew && (
+              <button
+                onClick={onNavigateToNew}
+                className="text-white/80 hover:text-white text-sm underline transition-colors"
+              >
+                Neue Version mit 3D-Globus ansehen →
+              </button>
+            )}
+          </div>
+          
+          {/* Additional Pages Links */}
+          <div className="mt-6 flex flex-wrap justify-center gap-4 text-sm">
+            <button
+              onClick={() => window.location.href = '/interactive-earth'}
+              className="text-white/60 hover:text-white/90 underline transition-colors"
+            >
+              🌍 Interaktive Erde
+            </button>
+            <button
+              onClick={() => window.location.href = '/questions-first'}
+              className="text-white/60 hover:text-white/90 underline transition-colors"
+            >
+              ❓ Fragen zuerst
+            </button>
+          </div>
         </div>
       </section>
     </div>

@@ -30,38 +30,50 @@ export function Footer({ onNavigate }: FooterProps) {
   }, []);
 
   const loadFooterSettings = async () => {
-    const { data } = await supabase
-      .from('footer_settings')
-      .select('content')
-      .single();
+    if (!supabase) return; // Supabase nicht verfügbar
+    
+    try {
+      const { data } = await supabase
+        .from('footer_settings')
+        .select('content')
+        .single();
 
-    if (data?.content) {
-      setFooterContent(data.content as FooterContent);
+      if (data?.content) {
+        setFooterContent(data.content as FooterContent);
+      }
+    } catch (error) {
+      console.warn('Fehler beim Laden der Footer-Settings:', error);
     }
   };
 
   const loadFooterMenuItems = async () => {
-    const { data, error } = await supabase
-      .from('footer_menu_items')
-      .select('id, title, url, category, linked_agreement_id, slug')
-      .eq('is_active', true)
-      .order('category')
-      .order('position');
+    if (!supabase) return; // Supabase nicht verfügbar
+    
+    try {
+      const { data, error } = await supabase
+        .from('footer_menu_items')
+        .select('id, title, url, category, linked_agreement_id, slug')
+        .eq('is_active', true)
+        .order('category')
+        .order('position');
 
-    if (error) {
-      console.error('Error loading footer menu items:', error);
-      return;
-    }
+      if (error) {
+        console.warn('Fehler beim Laden der Footer-Menu-Items:', error);
+        return;
+      }
 
-    if (data) {
-      const itemsWithUrls = data.map(item => ({
-        ...item,
-        url: item.linked_agreement_id && item.slug
-          ? `/agreement/${item.slug}`
-          : item.url
-      }));
+      if (data) {
+        const itemsWithUrls = data.map(item => ({
+          ...item,
+          url: item.linked_agreement_id && item.slug
+            ? `/agreement/${item.slug}`
+            : item.url
+        }));
 
-      setFooterMenuItems(itemsWithUrls);
+        setFooterMenuItems(itemsWithUrls);
+      }
+    } catch (error) {
+      console.warn('Fehler beim Laden der Footer-Menu-Items:', error);
     }
   };
 

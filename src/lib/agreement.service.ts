@@ -114,6 +114,8 @@ export async function createAgreementTitle(
   titel: string,
   beschreibung?: string
 ): Promise<Vereinbarungstitel> {
+  if (!supabase) throw new Error('Supabase ist nicht konfiguriert');
+  
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) throw new Error('User not authenticated');
 
@@ -301,6 +303,8 @@ export async function getAgreementBySlug(slug: string): Promise<Vereinbarung | n
 export async function createAgreement(
   agreementData: CreateAgreementData
 ): Promise<Vereinbarung> {
+  if (!supabase) throw new Error('Supabase ist nicht konfiguriert');
+  
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) throw new Error('User not authenticated');
 
@@ -387,6 +391,8 @@ export async function createAgreementVersion(
     : original.version;
 
   // Create new version
+  if (!supabase) throw new Error('Supabase ist nicht konfiguriert');
+  
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) throw new Error('User not authenticated');
 
@@ -495,6 +501,8 @@ export async function logAgreementAction(
   aktion: string,
   details?: any
 ): Promise<void> {
+  if (!supabase) throw new Error('Supabase ist nicht konfiguriert');
+  
   const { data: user } = await supabase.auth.getUser();
   if (!user.user) throw new Error('User not authenticated');
 

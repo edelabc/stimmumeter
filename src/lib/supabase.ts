@@ -3,16 +3,36 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-console.log('🔧 [SUPABASE INIT] URL:', supabaseUrl);
-console.log('🔧 [SUPABASE INIT] Anon Key:', supabaseAnonKey ? `${supabaseAnonKey.substring(0, 20)}...` : 'MISSING');
+const isSupabaseConfigured = supabaseUrl && 
+                             supabaseAnonKey && 
+                             !supabaseUrl.includes('xxxxxxxxxxxxx') &&
+                             supabaseAnonKey.length > 20;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  console.error('🔴 [SUPABASE INIT] Missing environment variables!');
-  console.error('🔴 [SUPABASE INIT] URL:', supabaseUrl);
-  console.error('🔴 [SUPABASE INIT] Key:', supabaseAnonKey);
+if (isSupabaseConfigured) {
+  console.log('🔧 [SUPABASE INIT] URL:', supabaseUrl);
+  console.log('🔧 [SUPABASE INIT] Anon Key:', `${supabaseAnonKey.substring(0, 20)}...`);
+} else {
+  console.log('ℹ️ [SUPABASE INIT] Supabase nicht konfiguriert - einige Features sind nicht verfügbar');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Erstelle Client nur wenn konfiguriert, sonst null
+export const supabase = isSupabaseConfigured 
+  ? createClient(supabaseUrl!, supabaseAnonKey!)
+  : null;
+
+// Helper-Funktion um zu prüfen ob Supabase verfügbar ist
+export const isSupabaseAvailable = () => isSupabaseConfigured;
+
+// Type-safe Supabase Client
+export type SupabaseClient = ReturnType<typeof createClient>;
+
+// Helper-Funktion für sichere Supabase-Aufrufe
+export const requireSupabase = (): SupabaseClient => {
+  if (!supabase) {
+    throw new Error('Supabase ist nicht konfiguriert. Bitte setzen Sie VITE_SUPABASE_URL und VITE_SUPABASE_ANON_KEY in der .env Datei.');
+  }
+  return supabase;
+};
 
 export interface Pseudonym {
   id: string;

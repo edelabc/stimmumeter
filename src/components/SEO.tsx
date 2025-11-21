@@ -23,12 +23,18 @@ export function SEO({ title, description, keywords }: SEOProps) {
   }, [title, description, keywords, siteSettings]);
 
   const loadSiteSettings = async () => {
-    const { data } = await supabase
-      .from('site_settings')
-      .select('*')
-      .single();
+    if (!supabase) return; // Supabase nicht verfügbar
+    
+    try {
+      const { data } = await supabase
+        .from('site_settings')
+        .select('*')
+        .single();
 
-    if (data) setSiteSettings(data);
+      if (data) setSiteSettings(data);
+    } catch (error) {
+      console.warn('Fehler beim Laden der Site-Settings:', error);
+    }
   };
 
   const updateMetaTags = () => {

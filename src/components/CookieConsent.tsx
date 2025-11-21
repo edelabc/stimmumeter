@@ -38,22 +38,33 @@ export function CookieConsent({ onNavigate }: CookieConsentProps) {
   };
 
   const loadAgreement = async () => {
-    const { data } = await supabase
-      .from('t_vereinbarungen')
-      .select(`
-        id,
-        version,
-        inhalt,
-        titel:t_vereinbarungstitel!inner(titel)
-      `)
-      .eq('titel.titel', 'Cookie-Einstellungen')
-      .order('version', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+    if (!supabase) return; // Supabase nicht verfügbar
+    
+    try {
+      const { data, error } = await supabase
+        .from('t_vereinbarungen')
+        .select(`
+          id,
+          version,
+          inhalt,
+          titel:t_vereinbarungstitel!inner(titel)
+        `)
+        .eq('titel.titel', 'Cookie-Einstellungen')
+        .order('version', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (data) {
-      setAgreementContent(data.inhalt);
-      setAgreementVersion(data.version);
+      if (error) {
+        console.warn('⚠️ Fehler beim Laden der Cookie-Vereinbarung:', error.message);
+        return;
+      }
+
+      if (data) {
+        setAgreementContent(data.inhalt);
+        setAgreementVersion(data.version);
+      }
+    } catch (error) {
+      console.warn('⚠️ Fehler beim Laden der Cookie-Vereinbarung:', error);
     }
   };
 

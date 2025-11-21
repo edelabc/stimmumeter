@@ -29,6 +29,12 @@ export function AccountSettings({ onClose }: AccountSettingsProps) {
   }, []);
 
   const loadUserData = async () => {
+    if (!supabase) {
+      console.warn('Supabase nicht verfügbar');
+      setLoading(false);
+      return;
+    }
+    
     setLoading(true);
     const { data: { user: authUser } } = await supabase.auth.getUser();
 

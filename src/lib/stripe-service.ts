@@ -24,6 +24,10 @@ export async function createPrepaidCheckoutSession(params: CreateCheckoutSession
     throw new Error('Betrag zu hoch (max. 10.000 EUR)');
   }
 
+  if (!supabase) {
+    throw new Error('Supabase ist nicht konfiguriert');
+  }
+
   try {
     // Get current session
     const { data: { session } } = await supabase.auth.getSession();
@@ -142,6 +146,10 @@ export async function verifyPaymentSession(sessionId: string): Promise<{
   amount: number;
   currency: string;
 }> {
+  if (!supabase) {
+    throw new Error('Supabase ist nicht konfiguriert');
+  }
+
   try {
     // Get current session
     const { data: { session } } = await supabase.auth.getSession();
@@ -182,6 +190,10 @@ export async function verifyPaymentSession(sessionId: string): Promise<{
 }
 
 export async function handlePaymentSuccess(sessionId: string, userId: string) {
+  if (!supabase) {
+    throw new Error('Supabase ist nicht konfiguriert');
+  }
+
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user || user.id !== userId) {
