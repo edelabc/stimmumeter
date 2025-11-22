@@ -99,41 +99,43 @@ export function Footer({ onNavigate }: FooterProps) {
   };
 
   return (
-    <footer className="bg-gray-900 text-gray-300 py-12 mt-auto">
-      <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-          <div className="md:col-span-1">
-            <h3 className="text-white font-bold text-lg mb-4">Stimmungs-Tracker</h3>
-            <p className="text-sm leading-relaxed">
-              Deine persönliche App zur Verfolgung und Analyse deines emotionalen Wohlbefindens.
-            </p>
+    <div className="relative z-50">
+      <footer className="bg-black text-white py-12 mt-auto border-t border-gray-800 relative">
+        <div className="container mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div className="md:col-span-1">
+              <h3 className="text-white font-bold text-lg mb-4">Stimmungs-Tracker</h3>
+              <p className="text-sm text-white leading-relaxed">
+                Deine persönliche App zur Verfolgung und Analyse deines emotionalen Wohlbefindens.
+              </p>
+            </div>
+
+            {Object.entries(groupedItems).map(([category, items]) => (
+              <div key={category}>
+                <h4 className="text-white font-semibold mb-4">
+                  {categoryLabels[category] || category}
+                </h4>
+                <ul className="space-y-2">
+                  {items.map((item) => (
+                    <li key={item.id}>
+                      <button
+                        onClick={() => handleNavigate(item.url)}
+                        className="text-sm text-white hover:text-gray-200 transition-colors"
+                      >
+                        {item.title}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
           </div>
 
-          {Object.entries(groupedItems).map(([category, items]) => (
-            <div key={category}>
-              <h4 className="text-white font-semibold mb-4">
-                {categoryLabels[category] || category}
-              </h4>
-              <ul className="space-y-2">
-                {items.map((item) => (
-                  <li key={item.id}>
-                    <button
-                      onClick={() => handleNavigate(item.url)}
-                      className="text-sm hover:text-white transition-colors"
-                    >
-                      {item.title}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ))}
+          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm text-white">
+            <p>{footerContent.text}</p>
+          </div>
         </div>
-
-        <div className="border-t border-gray-800 mt-8 pt-8 text-center text-sm">
-          <p>{footerContent.text}</p>
-        </div>
-      </div>
-    </footer>
+      </footer>
+    </div>
   );
 }

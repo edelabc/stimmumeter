@@ -60,13 +60,31 @@ export function loadGoogleMapsAPI(apiKey: string): Promise<void> {
     script.defer = true;
     
     script.onload = () => {
-      if (window.google && window.google.maps) {
-        mapsLoaded = true;
-        console.log('✅ [MAPS] Google Maps API erfolgreich geladen');
-        resolve();
-      } else {
-        reject(new Error('Google Maps API konnte nicht initialisiert werden'));
-      }
+      // Warte bis alle benötigten Klassen verfügbar sind
+      const checkClasses = () => {
+        if (window.google && 
+            window.google.maps && 
+            window.google.maps.Map && 
+            typeof window.google.maps.Map === 'function') {
+          mapsLoaded = true;
+          console.log('✅ [MAPS] Google Maps API erfolgreich geladen');
+          resolve();
+        } else {
+          // Prüfe erneut nach kurzer Verzögerung
+          setTimeout(() => {
+            if (window.google && window.google.maps && window.google.maps.Map) {
+              mapsLoaded = true;
+              console.log('✅ [MAPS] Google Maps API erfolgreich geladen (verzögert)');
+              resolve();
+            } else {
+              reject(new Error('Google Maps API konnte nicht initialisiert werden'));
+            }
+          }, 100);
+        }
+      };
+      
+      // Führe Prüfung sofort und nach kurzer Verzögerung aus
+      checkClasses();
     };
     
     script.onerror = () => {
@@ -94,4 +112,5 @@ export function resetGoogleMapsLoader() {
   mapsLoadPromise = null;
   mapsLoaded = false;
 }
+
 

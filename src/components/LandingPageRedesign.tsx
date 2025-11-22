@@ -87,6 +87,31 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
     if (!mapRef.current || !window.google) return;
 
     try {
+      // Warte bis Google Maps API vollständig geladen ist
+      // Prüfe ob Map-Konstruktor verfügbar ist
+      let retries = 0;
+      const maxRetries = 50; // 5 Sekunden maximale Wartezeit (50 * 100ms)
+      
+      while (retries < maxRetries) {
+        if (window.google && 
+            window.google.maps && 
+            window.google.maps.Map && 
+            typeof window.google.maps.Map === 'function') {
+          break; // API ist bereit
+        }
+        // Warte 100ms und versuche es erneut
+        await new Promise(resolve => setTimeout(resolve, 100));
+        retries++;
+      }
+
+      // Finale Prüfung ob Map-Konstruktor verfügbar ist
+      if (!window.google || 
+          !window.google.maps || 
+          !window.google.maps.Map || 
+          typeof window.google.maps.Map !== 'function') {
+        throw new Error('Google Maps Map-Konstruktor ist nicht verfügbar');
+      }
+
       // Verwende Standard Google Maps API (kompatibel mit älteren Versionen) 
       // CACHE-BREAKER: Fixed importLibrary issue - 2025-11-22
       console.log('🔧 [MAPS] Verwende Standard Google Maps API ohne importLibrary');
@@ -181,6 +206,14 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
 
   const updateMapMarkers = (data: MoodData[]) => {
     if (!googleMapRef.current || !window.google) return;
+
+    // Prüfe ob Marker-Konstruktor verfügbar ist
+    if (!window.google.maps || 
+        !window.google.maps.Marker || 
+        typeof window.google.maps.Marker !== 'function') {
+      console.warn('⚠️ [MAPS] Marker-Konstruktor ist nicht verfügbar');
+      return;
+    }
 
     // Entferne alte Marker
     markersRef.current.forEach(marker => marker.setMap(null));
