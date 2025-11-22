@@ -76,9 +76,9 @@ export async function fetchLiveMoodData(
   } catch (error: any) {
     // Prüfe ob es ein HTML-Fehler ist (404, etc.)
     if (error.message && error.message.includes('<!doctype')) {
-      console.warn('⚠️ [MOOD-API] API-Endpunkt nicht verfügbar, verwende Demo-Daten');
+      console.log('ℹ️ [MOOD-API] API-Endpunkt nicht verfügbar, verwende Demo-Daten');
     } else {
-      console.error('❌ Fehler beim Laden der Live-Mood-Daten:', error);
+      console.warn('⚠️ [MOOD-API] Fehler beim Laden der Live-Mood-Daten:', error);
     }
     
     // Fallback: Leere Antwort mit Demo-Daten-Struktur

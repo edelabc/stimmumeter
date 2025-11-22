@@ -87,7 +87,9 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
     if (!mapRef.current || !window.google) return;
 
     try {
-      const { Map } = await window.google.maps.importLibrary("maps") as google.maps.MapsLibrary;
+      // Verwende Standard Google Maps API (kompatibel mit älteren Versionen) 
+      // CACHE-BREAKER: Fixed importLibrary issue - 2025-11-22
+      console.log('🔧 [MAPS] Verwende Standard Google Maps API ohne importLibrary');
       
       // Dunkler Stil für Deep/Dark Theme
       const darkStyle: google.maps.MapTypeStyle[] = [
@@ -111,7 +113,7 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
         },
       ];
 
-      googleMapRef.current = new Map(mapRef.current, {
+      googleMapRef.current = new window.google.maps.Map(mapRef.current, {
         center: { lat: 20, lng: 0 },
         zoom: 2.5,
         mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID",

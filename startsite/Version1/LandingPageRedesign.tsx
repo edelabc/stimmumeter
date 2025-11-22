@@ -56,13 +56,15 @@ export function LandingPageRedesign({ onGetStarted }: { onGetStarted: () => void
   }, []);
 
   const initGoogleEarth = async () => {
-    if (!mapRef.current) return;
+    if (!mapRef.current || !window.google) return;
 
-    const { Map } = await google.maps.importLibrary("maps") as google.maps.MapsLibrary;
+    try {
+      // Verwende Standard Google Maps API (kompatibel mit älteren Versionen)
+      const Map = window.google.maps.Map;
     
-    // Dunkler Stil für Deep/Dark Theme
-    const darkStyle = [
-      { elementType: "geometry", stylers: [{ color: "#0a0a0a" }] },
+      // Dunkler Stil für Deep/Dark Theme
+      const darkStyle = [
+        { elementType: "geometry", stylers: [{ color: "#0a0a0a" }] },
       { elementType: "labels.text.stroke", stylers: [{ color: "#000000" }] },
       { elementType: "labels.text.fill", stylers: [{ color: "#746855" }] },
       {
@@ -80,27 +82,31 @@ export function LandingPageRedesign({ onGetStarted }: { onGetStarted: () => void
         elementType: "geometry",
         stylers: [{ color: "#001133" }],
       },
-    ];
+      ];
 
-    googleMapRef.current = new Map(mapRef.current, {
-      center: { lat: 20, lng: 0 },
-      zoom: 2.5,
-      mapId: "DEMO_MAP_ID", // Für erweiterte Marker
-      heading: 0,
-      tilt: 45,
-      styles: darkStyle,
-      disableDefaultUI: true,
-      backgroundColor: '#000000',
-      controlSize: 32,
-    });
+      googleMapRef.current = new window.google.maps.Map(mapRef.current, {
+        center: { lat: 20, lng: 0 },
+        zoom: 2.5,
+        mapId: "DEMO_MAP_ID", // Für erweiterte Marker
+        heading: 0,
+        tilt: 45,
+        styles: darkStyle,
+        disableDefaultUI: true,
+        backgroundColor: '#000000',
+        controlSize: 32,
+      });
 
-    setIsGlobeLoaded(true);
-    
-    // Starte Animation
-    animateGlobe();
-    
-    // Lade Live-Daten
-    loadLiveMoodData();
+      setIsGlobeLoaded(true);
+      
+      // Starte Animation
+      animateGlobe();
+      
+      // Lade Live-Daten
+      loadLiveMoodData();
+    } catch (error) {
+      console.error('❌ Fehler beim Initialisieren der Karte:', error);
+      loadLiveMoodData(); // Fallback zu Demo-Daten
+    }
   };
 
   const animateGlobe = () => {
