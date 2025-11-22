@@ -51,48 +51,97 @@ export function loadGoogleMapsAPI(apiKey: string): Promise<void> {
     return mapsLoadPromise;
   }
 
-  // Erstelle neues Script
+  // Erstelle neues Script mit Error-Callback-Handler
+  // Setze globalen Error-Handler für Google Maps Fehler
+  const errorCallbackName = `gm_authFailure_${Date.now()}`;
+  (window as any)[errorCallbackName] = () => {
+    mapsLoadPromise = null;
+    mapsLoaded = false;
+    console.error('❌ [MAPS] Google Maps Authentifizierungsfehler - API Key ungültig oder Berechtigungen fehlen');
+    console.error('Bitte prüfe:');
+    console.error('1. Ist der API Key korrekt in .env als VITE_GOOGLE_MAPS_API_KEY gesetzt?');
+    console.error('2. Ist die Maps JavaScript API in Google Cloud Console aktiviert?');
+    console.error('3. Ist die Places API in Google Cloud Console aktiviert?');
+    console.error('4. Ist Billing für das Projekt aktiviert?');
+    console.error('5. Sind die Domain-Restriktionen korrekt gesetzt?');
+  };
+  
   mapsLoadPromise = new Promise((resolve, reject) => {
     const script = document.createElement('script');
-    // Verwende Standard-Version, nicht Beta
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&loading=async`;
-    script.async = true;
-    script.defer = true;
+    // Verwende Standard-Version mit Callback für Error-Handling
+    // callback wird verwendet für erfolgreiches Laden
+    const callbackName = `initGoogleMaps_${Date.now()}`;
     
-    script.onload = () => {
+    // Setze Callback für erfolgreiches Laden
+    (window as any)[callbackName] = () => {
       // Warte bis alle benötigten Klassen verfügbar sind
       const checkClasses = () => {
         if (window.google && 
             window.google.maps && 
             window.google.maps.Map && 
             typeof window.google.maps.Map === 'function') {
-          mapsLoaded = true;
-          console.log('✅ [MAPS] Google Maps API erfolgreich geladen');
-          resolve();
+          // Prüfe auch ob Places API verfügbar ist
+          if (window.google.maps.places && window.google.maps.places.Autocomplete) {
+            mapsLoaded = true;
+            console.log('✅ [MAPS] Google Maps API mit Places erfolgreich geladen');
+            delete (window as any)[callbackName];
+            resolve();
+          } else {
+            // Places API nicht verfügbar - warne aber lade trotzdem
+            console.warn('⚠️ [MAPS] Google Maps API geladen, aber Places API nicht verfügbar');
+            console.warn('Bitte aktiviere die Places API in Google Cloud Console');
+            mapsLoaded = true;
+            delete (window as any)[callbackName];
+            resolve();
+          }
         } else {
           // Prüfe erneut nach kurzer Verzögerung
           setTimeout(() => {
             if (window.google && window.google.maps && window.google.maps.Map) {
-              mapsLoaded = true;
-              console.log('✅ [MAPS] Google Maps API erfolgreich geladen (verzögert)');
+              if (window.google.maps.places && window.google.maps.places.Autocomplete) {
+                mapsLoaded = true;
+                console.log('✅ [MAPS] Google Maps API erfolgreich geladen (verzögert)');
+              } else {
+                mapsLoaded = true;
+                console.warn('⚠️ [MAPS] Google Maps geladen, Places API fehlt');
+              }
+              delete (window as any)[callbackName];
               resolve();
             } else {
+              delete (window as any)[callbackName];
               reject(new Error('Google Maps API konnte nicht initialisiert werden'));
             }
-          }, 100);
+          }, 500);
         }
       };
       
-      // Führe Prüfung sofort und nach kurzer Verzögerung aus
+      // Führe Prüfung sofort aus
       checkClasses();
     };
     
+    // Konstruiere URL mit callback für erfolgreiches Laden
+    script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places&callback=${callbackName}&loading=async`;
+    script.async = true;
+    script.defer = true;
+    
     script.onerror = () => {
       mapsLoadPromise = null;
-      reject(new Error('Fehler beim Laden der Google Maps API'));
+      delete (window as any)[callbackName];
+      delete (window as any)[errorCallbackName];
+      reject(new Error('Fehler beim Laden der Google Maps API - Script konnte nicht geladen werden'));
     };
     
     document.head.appendChild(script);
+    
+    // Timeout-Fallback falls Callback nicht aufgerufen wird
+    setTimeout(() => {
+      if (!mapsLoaded && mapsLoadPromise) {
+        delete (window as any)[callbackName];
+        delete (window as any)[errorCallbackName];
+        mapsLoadPromise = null;
+        reject(new Error('Google Maps API konnte nicht innerhalb von 10 Sekunden geladen werden'));
+      }
+    }, 10000);
   });
 
   return mapsLoadPromise;

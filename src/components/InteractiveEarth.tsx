@@ -35,6 +35,11 @@ export function InteractiveEarth({ onNavigate }: InteractiveEarthProps) {
   const avatarsOverlayRef = useRef<HTMLDivElement>(null);
   const avatarPopupRef = useRef<HTMLDivElement>(null);
   const avatarsRef = useRef<HTMLElement[]>([]);
+  const autocompleteInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const isUserInteractingRef = useRef<boolean>(false);
+  const animationPausedRef = useRef<boolean>(false);
 
   const initGoogleMaps = async () => {
     // Prüfe nochmal ob Container verfügbar ist
@@ -78,7 +83,25 @@ export function InteractiveEarth({ onNavigate }: InteractiveEarthProps) {
         mapTypeId: window.google.maps.MapTypeId.SATELLITE,
         heading: 0,
         tilt: 45,
-        disableDefaultUI: true,
+        disableDefaultUI: false, // Aktiviert Zoom-Controls
+        zoomControl: true,
+        zoomControlOptions: {
+          position: window.google.maps.ControlPosition.RIGHT_CENTER,
+        },
+        panControl: false, // Pan wird über Maus/Touch gesteuert
+        mapTypeControl: true,
+        mapTypeControlOptions: {
+          position: window.google.maps.ControlPosition.TOP_RIGHT,
+        },
+        streetViewControl: false,
+        fullscreenControl: true,
+        fullscreenControlOptions: {
+          position: window.google.maps.ControlPosition.RIGHT_TOP,
+        },
+        draggable: true, // Verschieben aktiviert
+        keyboardShortcuts: true, // Tastatur-Navigation aktiviert
+        scrollwheel: true, // Mausrad-Zoom aktiviert
+        disableDoubleClickZoom: false, // Doppelklick-Zoom aktiviert
         backgroundColor: '#000000',
         // Styles entfernt um Warnung zu vermeiden (kann über Cloud Console konfiguriert werden)
       });
@@ -86,6 +109,12 @@ export function InteractiveEarth({ onNavigate }: InteractiveEarthProps) {
       console.log('✅ [MAPS] Karte erstellt:', mapInstanceRef.current);
       setMapLoaded(true);
       setMapInitializing(false);
+      
+      // Initialisiere Event-Handler für User-Interaktionen
+      setupMapInteractionHandlers(mapInstanceRef.current);
+      
+      // Initialisiere Adresssuche
+      initAutocomplete();
       
       // Starte Animation nach kurzer Verzögerung
       setTimeout(() => {
@@ -105,27 +134,176 @@ export function InteractiveEarth({ onNavigate }: InteractiveEarthProps) {
     return loadGoogleMapsAPI(apiKey);
   };
 
+  const initAutocomplete = () => {
+    if (!autocompleteInputRef.current || !mapInstanceRef.current) {
+      // Warte kurz und versuche es erneut
+      setTimeout(() => {
+        if (autocompleteInputRef.current && mapInstanceRef.current) {
+          initAutocomplete();
+        }
+      }, 500);
+      return;
+    }
+
+    // Prüfe ob Places API verfügbar ist
+    if (!window.google?.maps?.places) {
+      console.warn('⚠️ [MAPS] Places API nicht verfügbar');
+      console.warn('Bitte aktiviere die Places API in Google Cloud Console');
+      
+      // Verstecke das Eingabefeld wenn Places API nicht verfügbar ist
+      if (autocompleteInputRef.current) {
+        const inputElement = autocompleteInputRef.current as HTMLElement;
+        const parentElement = inputElement.parentElement;
+        if (parentElement) {
+          parentElement.style.display = 'none';
+        }
+      }
+      return;
+    }
+
+    try {
+      // Erstelle Autocomplete
+      autocompleteRef.current = new window.google.maps.places.Autocomplete(
+        autocompleteInputRef.current,
+        {
+          types: ['geocode'],
+          fields: ['geometry', 'formatted_address', 'name'],
+        }
+      );
+
+      // Wenn eine Adresse ausgewählt wird
+      autocompleteRef.current.addListener('place_changed', () => {
+        const place = autocompleteRef.current?.getPlace();
+        if (place?.geometry && mapInstanceRef.current) {
+          // Zentriere Karte auf ausgewählte Adresse
+          mapInstanceRef.current.setCenter(place.geometry.location!);
+          mapInstanceRef.current.setZoom(15);
+        }
+      });
+
+      console.log('✅ [MAPS] Adresssuche initialisiert');
+    } catch (error: any) {
+      console.error('❌ [MAPS] Fehler beim Initialisieren der Adresssuche:', error);
+      if (error.message?.includes('API key') || error.message?.includes('authentication')) {
+        console.error('❌ [MAPS] API Key Problem - bitte prüfe die Google Cloud Console Einstellungen');
+      }
+      
+      // Verstecke das Eingabefeld bei Fehler
+      if (autocompleteInputRef.current) {
+        const inputElement = autocompleteInputRef.current as HTMLElement;
+        const parentElement = inputElement.parentElement;
+        if (parentElement) {
+          parentElement.style.display = 'none';
+        }
+      }
+    }
+  };
+
+  const setupMapInteractionHandlers = (map: google.maps.Map) => {
+    // Pausiere Animation während User-Interaktion
+    const pauseAnimation = () => {
+      isUserInteractingRef.current = true;
+      animationPausedRef.current = true;
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+
+    // Setze Timer um Animation nach User-Interaktion wieder zu starten
+    let resumeTimeout: NodeJS.Timeout | null = null;
+    const resumeAnimation = () => {
+      if (resumeTimeout) {
+        clearTimeout(resumeTimeout);
+      }
+      resumeTimeout = setTimeout(() => {
+        isUserInteractingRef.current = false;
+        animationPausedRef.current = false;
+        if (!animationFrameRef.current && mapInstanceRef.current) {
+          animateGlobe();
+        }
+      }, 2000); // Warte 2 Sekunden nach letzter Interaktion
+    };
+
+    // Event-Handler für Drag/Pan
+    map.addListener('dragstart', () => {
+      pauseAnimation();
+    });
+
+    map.addListener('dragend', () => {
+      resumeAnimation();
+    });
+
+    // Event-Handler für Zoom
+    map.addListener('zoom_changed', () => {
+      pauseAnimation();
+      resumeAnimation();
+    });
+
+    // Event-Handler für Mouse-Down (beginnt Interaktion)
+    map.addListener('mousedown', () => {
+      pauseAnimation();
+    });
+
+    // Event-Handler für Mouse-Up (beendet Interaktion)
+    map.addListener('mouseup', () => {
+      resumeAnimation();
+    });
+
+    // Event-Handler für Touch-Start (Mobile)
+    map.addListener('touchstart', () => {
+      pauseAnimation();
+    });
+
+    // Event-Handler für Touch-End (Mobile)
+    map.addListener('touchend', () => {
+      resumeAnimation();
+    });
+
+    console.log('✅ [MAPS] Interaction-Handler registriert');
+  };
+
   const animateGlobe = () => {
-    if (!mapInstanceRef.current) {
-      console.warn('⚠️ [ANIMATION] mapInstanceRef.current ist null');
+    if (!mapInstanceRef.current || animationPausedRef.current) {
       return;
     }
     
-    console.log('🔵 [ANIMATION] Starte Globus-Animation...');
+    // Wenn bereits eine Animation läuft, nicht erneut starten
+    if (animationFrameRef.current) {
+      return;
+    }
+
     let heading = 0;
     const animate = () => {
-      if (!mapInstanceRef.current) return;
-      heading = (heading + 0.2) % 360;
+      // Stoppe Animation wenn pausiert oder User interagiert
+      if (!mapInstanceRef.current || animationPausedRef.current || isUserInteractingRef.current) {
+        animationFrameRef.current = null;
+        return;
+      }
+
+      heading = (heading + 0.1) % 360; // Langsamere Animation für bessere Performance
       try {
         mapInstanceRef.current.setHeading(heading);
         mapInstanceRef.current.setTilt(45);
       } catch (error) {
         console.warn('⚠️ [ANIMATION] Fehler bei Animation:', error);
+        animationFrameRef.current = null;
+        return;
       }
-      requestAnimationFrame(animate);
+      animationFrameRef.current = requestAnimationFrame(animate);
     };
-    animate();
+    animationFrameRef.current = requestAnimationFrame(animate);
   };
+
+  // Cleanup: Animation stoppen beim Unmount
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+  }, []);
 
   useEffect(() => {
     // Loading Screen
@@ -443,6 +621,18 @@ export function InteractiveEarth({ onNavigate }: InteractiveEarthProps) {
 
         {/* Right Globe Container */}
         <div className="relative w-full bg-black">
+          {/* Adresssuche-Eingabefeld */}
+          {mapLoaded && (
+            <div className="absolute top-4 left-4 z-[50] bg-black/80 backdrop-blur-md rounded-lg p-2 border border-white/20">
+              <input
+                ref={autocompleteInputRef}
+                type="text"
+                placeholder="🔍 Adresse suchen..."
+                className="w-[300px] px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50"
+              />
+            </div>
+          )}
+          
           {/* Google Maps Container - WICHTIG: ref muss gesetzt sein bevor useEffect läuft */}
           {!isLoading && (
             <div ref={mapContainerRef} className="w-full h-full min-h-[600px]" />

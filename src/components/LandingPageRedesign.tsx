@@ -41,6 +41,10 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
   const googleMapRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const animationFrameRef = useRef<number | null>(null);
+  const autocompleteInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const isUserInteractingRef = useRef<boolean>(false);
+  const animationPausedRef = useRef<boolean>(false);
 
   // Parallax-Effekt
   useEffect(() => {
@@ -145,12 +149,36 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
         heading: 0,
         tilt: 45,
         styles: darkStyle,
-        disableDefaultUI: true,
+        disableDefaultUI: false, // Aktiviert Zoom-Controls
+        zoomControl: true,
+        zoomControlOptions: {
+          position: window.google.maps.ControlPosition.RIGHT_CENTER,
+        },
+        panControl: false, // Pan wird über Maus/Touch gesteuert
+        mapTypeControl: true,
+        mapTypeControlOptions: {
+          position: window.google.maps.ControlPosition.TOP_RIGHT,
+        },
+        streetViewControl: false,
+        fullscreenControl: true,
+        fullscreenControlOptions: {
+          position: window.google.maps.ControlPosition.RIGHT_TOP,
+        },
+        draggable: true, // Verschieben aktiviert
+        keyboardShortcuts: true, // Tastatur-Navigation aktiviert
+        scrollwheel: true, // Mausrad-Zoom aktiviert
+        disableDoubleClickZoom: false, // Doppelklick-Zoom aktiviert
         backgroundColor: '#000000',
         controlSize: 32,
       });
 
       setIsGlobeLoaded(true);
+      
+      // Initialisiere Event-Handler für User-Interaktionen
+      setupMapInteractionHandlers(googleMapRef.current);
+      
+      // Initialisiere Adresssuche
+      initAutocomplete();
       
       // Starte Animation
       animateGlobe();
@@ -163,21 +191,168 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
     }
   };
 
+  const setupMapInteractionHandlers = (map: google.maps.Map) => {
+    // Pausiere Animation während User-Interaktion
+    const pauseAnimation = () => {
+      isUserInteractingRef.current = true;
+      animationPausedRef.current = true;
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+    };
+
+    // Setze Timer um Animation nach User-Interaktion wieder zu starten
+    let resumeTimeout: NodeJS.Timeout | null = null;
+    const resumeAnimation = () => {
+      if (resumeTimeout) {
+        clearTimeout(resumeTimeout);
+      }
+      resumeTimeout = setTimeout(() => {
+        isUserInteractingRef.current = false;
+        animationPausedRef.current = false;
+        if (!animationFrameRef.current && googleMapRef.current) {
+          animateGlobe();
+        }
+      }, 2000); // Warte 2 Sekunden nach letzter Interaktion
+    };
+
+    // Event-Handler für Drag/Pan
+    map.addListener('dragstart', () => {
+      pauseAnimation();
+    });
+
+    map.addListener('dragend', () => {
+      resumeAnimation();
+    });
+
+    // Event-Handler für Zoom
+    map.addListener('zoom_changed', () => {
+      pauseAnimation();
+      resumeAnimation();
+    });
+
+    // Event-Handler für Mouse-Down (beginnt Interaktion)
+    map.addListener('mousedown', () => {
+      pauseAnimation();
+    });
+
+    // Event-Handler für Mouse-Up (beendet Interaktion)
+    map.addListener('mouseup', () => {
+      resumeAnimation();
+    });
+
+    // Event-Handler für Touch-Start (Mobile)
+    map.addListener('touchstart', () => {
+      pauseAnimation();
+    });
+
+    // Event-Handler für Touch-End (Mobile)
+    map.addListener('touchend', () => {
+      resumeAnimation();
+    });
+
+    console.log('✅ [MAPS] Interaction-Handler registriert');
+  };
+
   const animateGlobe = () => {
-    if (!googleMapRef.current) return;
-    
+    if (!googleMapRef.current || animationPausedRef.current) {
+      return;
+    }
+
+    // Wenn bereits eine Animation läuft, nicht erneut starten
+    if (animationFrameRef.current) {
+      return;
+    }
+
     let heading = 0;
     const animate = () => {
-      if (!googleMapRef.current) return;
-      heading = (heading + 0.2) % 360;
-      googleMapRef.current.moveCamera({
-        heading,
-        tilt: 45,
-        zoom: 2.5,
-      });
+      // Stoppe Animation wenn pausiert oder User interagiert
+      if (!googleMapRef.current || animationPausedRef.current || isUserInteractingRef.current) {
+        animationFrameRef.current = null;
+        return;
+      }
+
+      heading = (heading + 0.1) % 360; // Langsamere Animation für bessere Performance
+      try {
+        googleMapRef.current.moveCamera({
+          heading,
+          tilt: 45,
+          zoom: 2.5,
+        });
+      } catch (error) {
+        console.warn('⚠️ [ANIMATION] Fehler bei Animation:', error);
+        animationFrameRef.current = null;
+        return;
+      }
       animationFrameRef.current = requestAnimationFrame(animate);
     };
-    animate();
+    animationFrameRef.current = requestAnimationFrame(animate);
+  };
+
+  const initAutocomplete = () => {
+    if (!autocompleteInputRef.current || !googleMapRef.current) {
+      // Warte kurz und versuche es erneut
+      setTimeout(() => {
+        if (autocompleteInputRef.current && googleMapRef.current) {
+          initAutocomplete();
+        }
+      }, 500);
+      return;
+    }
+
+    // Prüfe ob Places API verfügbar ist
+    if (!window.google?.maps?.places) {
+      console.warn('⚠️ [MAPS] Places API nicht verfügbar');
+      console.warn('Bitte aktiviere die Places API in Google Cloud Console');
+      
+      // Verstecke das Eingabefeld wenn Places API nicht verfügbar ist
+      if (autocompleteInputRef.current) {
+        const inputElement = autocompleteInputRef.current as HTMLElement;
+        const parentElement = inputElement.parentElement;
+        if (parentElement) {
+          parentElement.style.display = 'none';
+        }
+      }
+      return;
+    }
+
+    try {
+      // Erstelle Autocomplete
+      autocompleteRef.current = new window.google.maps.places.Autocomplete(
+        autocompleteInputRef.current,
+        {
+          types: ['geocode'],
+          fields: ['geometry', 'formatted_address', 'name'],
+        }
+      );
+
+      // Wenn eine Adresse ausgewählt wird
+      autocompleteRef.current.addListener('place_changed', () => {
+        const place = autocompleteRef.current?.getPlace();
+        if (place?.geometry && googleMapRef.current) {
+          // Zentriere Karte auf ausgewählte Adresse
+          googleMapRef.current.setCenter(place.geometry.location!);
+          googleMapRef.current.setZoom(15);
+        }
+      });
+
+      console.log('✅ [MAPS] Adresssuche initialisiert');
+    } catch (error: any) {
+      console.error('❌ [MAPS] Fehler beim Initialisieren der Adresssuche:', error);
+      if (error.message?.includes('API key') || error.message?.includes('authentication')) {
+        console.error('❌ [MAPS] API Key Problem - bitte prüfe die Google Cloud Console Einstellungen');
+      }
+      
+      // Verstecke das Eingabefeld bei Fehler
+      if (autocompleteInputRef.current) {
+        const inputElement = autocompleteInputRef.current as HTMLElement;
+        const parentElement = inputElement.parentElement;
+        if (parentElement) {
+          parentElement.style.display = 'none';
+        }
+      }
+    }
   };
 
   const loadLiveMoodData = async () => {
@@ -276,6 +451,17 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
       <section className="relative min-h-screen flex items-center justify-center">
         {/* 3D Globus Container */}
         <div className="absolute inset-0 z-10">
+          {/* Adresssuche-Eingabefeld */}
+          {isGlobeLoaded && (
+            <div className="absolute top-20 left-4 z-[20] bg-black/80 backdrop-blur-md rounded-lg p-2 border border-white/20">
+              <input
+                ref={autocompleteInputRef}
+                type="text"
+                placeholder="🔍 Adresse suchen..."
+                className="w-[300px] px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50"
+              />
+            </div>
+          )}
           <div ref={mapRef} className="w-full h-full opacity-80" />
           
           {/* Overlay mit Interaktion */}

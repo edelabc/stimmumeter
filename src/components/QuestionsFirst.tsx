@@ -23,6 +23,10 @@ export function QuestionsFirst({ onNavigate }: QuestionsFirstProps) {
   const mapInstanceRef = useRef<google.maps.Map | null>(null);
   const markersRef = useRef<google.maps.Marker[]>([]);
   const rotationRef = useRef<number | null>(null);
+  const autocompleteInputRef = useRef<HTMLInputElement>(null);
+  const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
+  const isUserInteractingRef = useRef<boolean>(false);
+  const rotationPausedRef = useRef<boolean>(false);
 
   useEffect(() => {
     console.log('🔵 [QUESTIONS] showIntro:', showIntro);
@@ -101,7 +105,25 @@ export function QuestionsFirst({ onNavigate }: QuestionsFirstProps) {
         mapTypeId: window.google.maps.MapTypeId.SATELLITE,
         tilt: currentView === '3d' ? 45 : 0,
         heading: 0,
-        disableDefaultUI: true,
+        disableDefaultUI: false, // Aktiviert Zoom-Controls
+        zoomControl: true,
+        zoomControlOptions: {
+          position: window.google.maps.ControlPosition.RIGHT_CENTER,
+        },
+        panControl: false, // Pan wird über Maus/Touch gesteuert
+        mapTypeControl: true,
+        mapTypeControlOptions: {
+          position: window.google.maps.ControlPosition.TOP_RIGHT,
+        },
+        streetViewControl: false,
+        fullscreenControl: true,
+        fullscreenControlOptions: {
+          position: window.google.maps.ControlPosition.RIGHT_TOP,
+        },
+        draggable: true, // Verschieben aktiviert
+        keyboardShortcuts: true, // Tastatur-Navigation aktiviert
+        scrollwheel: true, // Mausrad-Zoom aktiviert
+        disableDoubleClickZoom: false, // Doppelklick-Zoom aktiviert
         // Styles entfernt um Warnung zu vermeiden (kann über Cloud Console konfiguriert werden)
       });
 
@@ -109,10 +131,145 @@ export function QuestionsFirst({ onNavigate }: QuestionsFirstProps) {
       setMapLoaded(true);
       console.log('✅ [MAPS] Karte erstellt');
       
+      // Initialisiere Event-Handler für User-Interaktionen
+      setupMapInteractionHandlers(map);
+      
+      // Initialisiere Adresssuche
+      initAutocomplete();
+      
       addMoodMarkers(map);
       updateInfoCards();
     } catch (error) {
       console.error('❌ [MAPS] Fehler beim Erstellen der Karte:', error);
+    }
+  };
+
+  const setupMapInteractionHandlers = (map: google.maps.Map) => {
+    // Pausiere Rotation während User-Interaktion
+    const pauseRotation = () => {
+      isUserInteractingRef.current = true;
+      rotationPausedRef.current = true;
+      if (rotationRef.current) {
+        cancelAnimationFrame(rotationRef.current);
+        rotationRef.current = null;
+      }
+    };
+
+    // Setze Timer um Rotation nach User-Interaktion wieder zu starten
+    let resumeTimeout: NodeJS.Timeout | null = null;
+    const resumeRotation = () => {
+      if (resumeTimeout) {
+        clearTimeout(resumeTimeout);
+      }
+      resumeTimeout = setTimeout(() => {
+        isUserInteractingRef.current = false;
+        rotationPausedRef.current = false;
+        if (!rotationRef.current && mapInstanceRef.current && currentView === '3d') {
+          start3DRotation();
+        }
+      }, 2000); // Warte 2 Sekunden nach letzter Interaktion
+    };
+
+    // Event-Handler für Drag/Pan
+    map.addListener('dragstart', () => {
+      pauseRotation();
+    });
+
+    map.addListener('dragend', () => {
+      resumeRotation();
+    });
+
+    // Event-Handler für Zoom
+    map.addListener('zoom_changed', () => {
+      pauseRotation();
+      resumeRotation();
+    });
+
+    // Event-Handler für Mouse-Down (beginnt Interaktion)
+    map.addListener('mousedown', () => {
+      pauseRotation();
+    });
+
+    // Event-Handler für Mouse-Up (beendet Interaktion)
+    map.addListener('mouseup', () => {
+      resumeRotation();
+    });
+
+    // Event-Handler für Touch-Start (Mobile)
+    map.addListener('touchstart', () => {
+      pauseRotation();
+    });
+
+    // Event-Handler für Touch-End (Mobile)
+    map.addListener('touchend', () => {
+      resumeRotation();
+    });
+
+    console.log('✅ [MAPS] Interaction-Handler registriert');
+  };
+
+  const initAutocomplete = () => {
+    if (!autocompleteInputRef.current || !mapInstanceRef.current) {
+      // Warte kurz und versuche es erneut
+      setTimeout(() => {
+        if (autocompleteInputRef.current && mapInstanceRef.current) {
+          initAutocomplete();
+        }
+      }, 500);
+      return;
+    }
+
+    // Prüfe ob Places API verfügbar ist
+    if (!window.google?.maps?.places) {
+      console.warn('⚠️ [MAPS] Places API nicht verfügbar');
+      console.warn('Bitte aktiviere die Places API in Google Cloud Console');
+      
+      // Verstecke das Eingabefeld wenn Places API nicht verfügbar ist
+      if (autocompleteInputRef.current) {
+        const inputElement = autocompleteInputRef.current as HTMLElement;
+        const parentElement = inputElement.parentElement;
+        if (parentElement) {
+          parentElement.style.display = 'none';
+        }
+      }
+      return;
+    }
+
+    try {
+      // Erstelle Autocomplete
+      autocompleteRef.current = new window.google.maps.places.Autocomplete(
+        autocompleteInputRef.current,
+        {
+          types: ['geocode'],
+          fields: ['geometry', 'formatted_address', 'name'],
+        }
+      );
+
+      // Wenn eine Adresse ausgewählt wird
+      autocompleteRef.current.addListener('place_changed', () => {
+        const place = autocompleteRef.current?.getPlace();
+        if (place?.geometry && mapInstanceRef.current) {
+          // Zentriere Karte auf ausgewählte Adresse
+          mapInstanceRef.current.setCenter(place.geometry.location!);
+          mapInstanceRef.current.setZoom(15);
+        }
+      });
+
+      console.log('✅ [MAPS] Adresssuche initialisiert');
+    } catch (error: any) {
+      console.error('❌ [MAPS] Fehler beim Initialisieren der Adresssuche:', error);
+      if (error.message?.includes('API key') || error.message?.includes('authentication')) {
+        console.error('❌ [MAPS] API Key Problem - bitte prüfe die Google Cloud Console Einstellungen');
+      }
+      
+      // Verstecke das Eingabefeld bei Fehler
+      if (autocompleteInputRef.current) {
+        const inputElement = autocompleteInputRef.current as HTMLElement;
+        const parentElement = inputElement.parentElement;
+        if (parentElement) {
+          parentElement.style.display = 'none';
+        }
+      }
     }
   };
 
@@ -216,32 +373,30 @@ export function QuestionsFirst({ onNavigate }: QuestionsFirstProps) {
   };
 
   const start3DRotation = () => {
-    if (!mapInstanceRef.current) return;
-    
-    // Stoppe vorherige Rotation
-    if (rotationRef.current) {
-      cancelAnimationFrame(rotationRef.current);
+    if (!mapInstanceRef.current || currentView !== '3d' || rotationPausedRef.current) {
+      return;
     }
-    
+
+    // Wenn bereits eine Rotation läuft, nicht erneut starten
+    if (rotationRef.current) {
+      return;
+    }
+
     let heading = 0;
     const rotate = () => {
-      if (!mapInstanceRef.current || currentView !== '3d') {
-        if (rotationRef.current) {
-          cancelAnimationFrame(rotationRef.current);
-          rotationRef.current = null;
-        }
+      // Stoppe Rotation wenn pausiert, User interagiert oder View geändert wurde
+      if (!mapInstanceRef.current || currentView !== '3d' || rotationPausedRef.current || isUserInteractingRef.current) {
+        rotationRef.current = null;
         return;
       }
-      heading = (heading + 0.2) % 360;
+
+      heading = (heading + 0.1) % 360; // Langsamere Rotation für bessere Performance
       try {
         mapInstanceRef.current.setHeading(heading);
         mapInstanceRef.current.setTilt(45);
       } catch (error) {
         console.warn('⚠️ [3D] Fehler bei Rotation:', error);
-        if (rotationRef.current) {
-          cancelAnimationFrame(rotationRef.current);
-          rotationRef.current = null;
-        }
+        rotationRef.current = null;
         return;
       }
       rotationRef.current = requestAnimationFrame(rotate);
@@ -467,6 +622,18 @@ export function QuestionsFirst({ onNavigate }: QuestionsFirstProps) {
 
       {/* Right Globe Container */}
       <div className="relative w-full min-h-[calc(100vh-4rem)] bg-black">
+        {/* Adresssuche-Eingabefeld */}
+        {mapLoaded && (
+          <div className="absolute top-4 left-4 z-[50] bg-black/80 backdrop-blur-md rounded-lg p-2 border border-white/20">
+            <input
+              ref={autocompleteInputRef}
+              type="text"
+              placeholder="🔍 Adresse suchen..."
+              className="w-[300px] px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50"
+            />
+          </div>
+        )}
+        
         <div ref={mapRef} id="map" className="w-full h-full min-h-[600px]" />
         
         {/* Loading Indicator für Karte */}
