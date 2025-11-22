@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Settings, CheckCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface CookiePreferences {
   necessary: boolean;
@@ -38,7 +38,7 @@ export function CookieConsent({ onNavigate }: CookieConsentProps) {
   };
 
   const loadAgreement = async () => {
-    if (!supabase) return; // Supabase nicht verfügbar
+    if (!supabase || !isSupabaseConfigured()) return; // Supabase nicht verfügbar
     
     try {
       const { data, error } = await supabase

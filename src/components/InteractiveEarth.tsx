@@ -80,10 +80,7 @@ export function InteractiveEarth({ onNavigate }: InteractiveEarthProps) {
         tilt: 45,
         disableDefaultUI: true,
         backgroundColor: '#000000',
-        styles: [
-          { elementType: "geometry", stylers: [{ color: "#0a0a0a" }] },
-          { elementType: "labels", stylers: [{ visibility: "off" }] },
-        ],
+        // Styles entfernt um Warnung zu vermeiden (kann über Cloud Console konfiguriert werden)
       });
 
       console.log('✅ [MAPS] Karte erstellt:', mapInstanceRef.current);
@@ -102,46 +99,10 @@ export function InteractiveEarth({ onNavigate }: InteractiveEarthProps) {
     }
   };
 
-  const loadGoogleMapsScript = (apiKey: string): Promise<void> => {
-    return new Promise((resolve, reject) => {
-      if (document.querySelector('script[src*="maps.googleapis.com"]')) {
-        // Script bereits vorhanden, warte auf Laden
-        console.log('🔵 [MAPS] Script bereits vorhanden, warte auf Laden...');
-        const checkInterval = setInterval(() => {
-          if (window.google && window.google.maps) {
-            console.log('✅ [MAPS] Google Maps API geladen');
-            clearInterval(checkInterval);
-            resolve();
-          }
-        }, 100);
-        
-        setTimeout(() => {
-          clearInterval(checkInterval);
-          if (!window.google) {
-            console.error('❌ [MAPS] Timeout beim Laden der Google Maps API');
-            reject(new Error('Google Maps API konnte nicht geladen werden'));
-          }
-        }, 10000);
-        return;
-      }
-
-      console.log('🔵 [MAPS] Erstelle neues Script-Tag...');
-      const script = document.createElement('script');
-      // Verwende Standard-Version, nicht Beta
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-      script.async = true;
-      script.defer = true;
-      script.onload = () => {
-        console.log('✅ [MAPS] Script erfolgreich geladen');
-        resolve();
-      };
-      script.onerror = (error) => {
-        console.error('❌ [MAPS] Fehler beim Laden des Scripts:', error);
-        reject(new Error('Fehler beim Laden der Google Maps API'));
-      };
-      document.head.appendChild(script);
-      console.log('🔵 [MAPS] Script-Tag hinzugefügt:', script.src);
-    });
+  const loadGoogleMapsScript = async (apiKey: string): Promise<void> => {
+    // Verwende zentrale Google Maps Loader-Funktion
+    const { loadGoogleMapsAPI } = await import('../lib/google-maps-loader');
+    return loadGoogleMapsAPI(apiKey);
   };
 
   const animateGlobe = () => {
@@ -351,7 +312,7 @@ export function InteractiveEarth({ onNavigate }: InteractiveEarthProps) {
   }
 
   return (
-    <div className="grid grid-cols-[400px_1fr] h-screen relative bg-black text-white overflow-hidden">
+    <div className="grid grid-cols-[400px_1fr] min-h-[calc(100vh-4rem)] relative bg-black text-white overflow-hidden">
       {/* Left Control Panel */}
       <div className="bg-[rgba(15,23,42,0.95)] backdrop-blur-[20px] border-r border-white/10 p-8 overflow-y-auto relative z-[100]">
         <div className="text-[1.8rem] font-bold mb-1 bg-gradient-to-br from-white to-gray-400 bg-clip-text text-transparent">
@@ -457,10 +418,10 @@ export function InteractiveEarth({ onNavigate }: InteractiveEarthProps) {
       </div>
 
       {/* Right Globe Container */}
-      <div className="relative w-full h-screen bg-black">
+      <div className="relative w-full min-h-[calc(100vh-4rem)] bg-black">
         {/* Google Maps Container - WICHTIG: ref muss gesetzt sein bevor useEffect läuft */}
         {!isLoading && (
-          <div ref={mapContainerRef} className="w-full h-full min-h-[400px]" />
+          <div ref={mapContainerRef} className="w-full h-full min-h-[600px]" />
         )}
         
         {/* Loading Indicator für Karte */}

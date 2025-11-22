@@ -1,7 +1,7 @@
-import { supabase } from './supabase';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 export async function isAdmin(userId: string): Promise<boolean> {
-  if (!supabase) return false;
+  if (!isSupabaseConfigured() || !supabase) return false;
   
   try {
     const { data } = await supabase
@@ -18,7 +18,7 @@ export async function isAdmin(userId: string): Promise<boolean> {
 }
 
 export async function checkCurrentUserIsAdmin(): Promise<boolean> {
-  if (!supabase) return false;
+  if (!isSupabaseConfigured() || !supabase) return false;
   
   try {
     const { data: { user } } = await supabase.auth.getUser();
@@ -31,7 +31,7 @@ export async function checkCurrentUserIsAdmin(): Promise<boolean> {
 }
 
 export async function getAllUsers() {
-  if (!supabase) {
+  if (!isSupabaseConfigured() || !supabase) {
     return {
       data: null,
       error: {
@@ -41,12 +41,19 @@ export async function getAllUsers() {
     };
   }
 
-  const { data, error } = await supabase.auth.admin.listUsers();
-  return { data, error };
+  try {
+    const { data, error } = await supabase.auth.admin.listUsers();
+    return { data, error };
+  } catch (err: any) {
+    return {
+      data: null,
+      error: err,
+    };
+  }
 }
 
 export async function deleteUser(userId: string) {
-  if (!supabase) {
+  if (!isSupabaseConfigured() || !supabase) {
     return {
       data: null,
       error: {
@@ -56,12 +63,19 @@ export async function deleteUser(userId: string) {
     };
   }
 
-  const { data, error } = await supabase.auth.admin.deleteUser(userId);
-  return { data, error };
+  try {
+    const { data, error } = await supabase.auth.admin.deleteUser(userId);
+    return { data, error };
+  } catch (err: any) {
+    return {
+      data: null,
+      error: err,
+    };
+  }
 }
 
 export async function makeAdmin(userId: string) {
-  if (!supabase) {
+  if (!isSupabaseConfigured() || !supabase) {
     return {
       data: null,
       error: {
@@ -71,14 +85,21 @@ export async function makeAdmin(userId: string) {
     };
   }
 
-  const { data, error } = await supabase
-    .from('admin_users')
-    .insert({ user_id: userId });
-  return { data, error };
+  try {
+    const { data, error } = await supabase
+      .from('admin_users')
+      .insert({ user_id: userId });
+    return { data, error };
+  } catch (err: any) {
+    return {
+      data: null,
+      error: err,
+    };
+  }
 }
 
 export async function removeAdmin(userId: string) {
-  if (!supabase) {
+  if (!isSupabaseConfigured() || !supabase) {
     return {
       data: null,
       error: {
@@ -88,9 +109,16 @@ export async function removeAdmin(userId: string) {
     };
   }
 
-  const { data, error } = await supabase
-    .from('admin_users')
-    .delete()
-    .eq('user_id', userId);
-  return { data, error };
+  try {
+    const { data, error } = await supabase
+      .from('admin_users')
+      .delete()
+      .eq('user_id', userId);
+    return { data, error };
+  } catch (err: any) {
+    return {
+      data: null,
+      error: err,
+    };
+  }
 }

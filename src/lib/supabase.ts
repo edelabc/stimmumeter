@@ -3,35 +3,32 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-const isSupabaseConfigured = supabaseUrl && 
-                             supabaseAnonKey && 
-                             !supabaseUrl.includes('xxxxxxxxxxxxx') &&
-                             supabaseAnonKey.length > 20;
-
-if (isSupabaseConfigured) {
-  console.log('🔧 [SUPABASE INIT] URL:', supabaseUrl);
-  console.log('🔧 [SUPABASE INIT] Anon Key:', `${supabaseAnonKey.substring(0, 20)}...`);
-} else {
-  console.log('ℹ️ [SUPABASE INIT] Supabase nicht konfiguriert - einige Features sind nicht verfügbar');
+if (!supabaseUrl || !supabaseAnonKey) {
+  throw new Error('Supabase environment variables are missing');
 }
 
-// Erstelle Client nur wenn konfiguriert, sonst null
-export const supabase = isSupabaseConfigured 
-  ? createClient(supabaseUrl!, supabaseAnonKey!)
-  : null;
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Helper-Funktion um zu prüfen ob Supabase verfügbar ist
-export const isSupabaseAvailable = () => isSupabaseConfigured;
-
-// Type-safe Supabase Client
-export type SupabaseClient = ReturnType<typeof createClient>;
-
-// Helper-Funktion für sichere Supabase-Aufrufe
-export const requireSupabase = (): SupabaseClient => {
-  if (!supabase) {
-    throw new Error('Supabase ist nicht konfiguriert. Bitte setzen Sie VITE_SUPABASE_URL und VITE_SUPABASE_ANON_KEY in der .env Datei.');
+// Helper-Funktion um zu prüfen ob Supabase wirklich konfiguriert ist (kein Platzhalter)
+export const isSupabaseConfigured = (): boolean => {
+  if (!supabaseUrl || !supabaseAnonKey) return false;
+  const url = supabaseUrl.toLowerCase().trim();
+  const key = supabaseAnonKey.toLowerCase().trim();
+  
+  // Prüfe auf Platzhalter
+  if (url.includes('xxxxxxxxxxxxx') || url.includes('dummy') || url.includes('placeholder')) {
+    return false;
   }
-  return supabase;
+  if (key.includes('xxxxxxxxxxxxx') || key.includes('dummy') || key.includes('placeholder')) {
+    return false;
+  }
+  
+  // Prüfe ob URL gültig aussieht
+  if (!url.includes('.supabase.co') || !url.startsWith('https://')) {
+    return false;
+  }
+  
+  return true;
 };
 
 export interface Pseudonym {

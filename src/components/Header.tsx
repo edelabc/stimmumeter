@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Menu, X, LogOut } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { signOut } from '../lib/auth';
 
 interface MenuItem {
@@ -24,7 +24,7 @@ export function Header({ onNavigate }: HeaderProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    if (!supabase) return; // Supabase nicht verfügbar
+    if (!supabase || !isSupabaseConfigured()) return; // Supabase nicht verfügbar
     
     loadMenuItems();
     loadSiteSettings();
@@ -41,7 +41,7 @@ export function Header({ onNavigate }: HeaderProps) {
   }, []);
 
   const checkAuthStatus = async () => {
-    if (!supabase) return;
+    if (!supabase || !isSupabaseConfigured()) return;
     
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -52,7 +52,7 @@ export function Header({ onNavigate }: HeaderProps) {
   };
 
   const loadMenuItems = async () => {
-    if (!supabase) return;
+    if (!supabase || !isSupabaseConfigured()) return;
     
     try {
       const { data: { session } } = await supabase.auth.getSession();

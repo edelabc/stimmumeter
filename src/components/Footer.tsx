@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface FooterMenuItem {
   id: string;
@@ -30,7 +30,7 @@ export function Footer({ onNavigate }: FooterProps) {
   }, []);
 
   const loadFooterSettings = async () => {
-    if (!supabase) return; // Supabase nicht verfügbar
+    if (!supabase || !isSupabaseConfigured()) return; // Supabase nicht verfügbar
     
     try {
       const { data } = await supabase
@@ -47,7 +47,7 @@ export function Footer({ onNavigate }: FooterProps) {
   };
 
   const loadFooterMenuItems = async () => {
-    if (!supabase) return; // Supabase nicht verfügbar
+    if (!supabase || !isSupabaseConfigured()) return; // Supabase nicht verfügbar
     
     try {
       const { data, error } = await supabase

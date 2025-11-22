@@ -39,8 +39,8 @@ function App() {
   const checkUser = async () => {
     const currentUser = await getCurrentUser();
 
-    // Check if user is blocked (nur wenn Supabase verfügbar)
-    if (currentUser && supabase) {
+    // Check if user is blocked
+    if (currentUser) {
       try {
         const { data: profile } = await supabase
           .from('user_profiles')
@@ -253,10 +253,12 @@ function App() {
       <>
         <SEO />
         <CookieConsent onNavigate={navigate} />
-        <LandingPageRedesign 
-          onGetStarted={handleGetStarted}
-          onNavigateToOld={() => navigate('/landing-old')}
-        />
+        <Layout onNavigate={navigate}>
+          <LandingPageRedesign 
+            onGetStarted={handleGetStarted}
+            onNavigateToOld={() => navigate('/landing-old')}
+          />
+        </Layout>
       </>
     );
   }
@@ -282,11 +284,10 @@ function App() {
     return (
       <>
         <SEO title="Interaktive Erde - WAMELI" />
-        {/* CookieConsent nur wenn Supabase konfiguriert */}
-        {import.meta.env.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes('xxxxxxxxxxxxx') && (
-          <CookieConsent onNavigate={navigate} />
-        )}
-        <InteractiveEarth onNavigate={navigate} />
+        <CookieConsent onNavigate={navigate} />
+        <Layout onNavigate={navigate}>
+          <InteractiveEarth onNavigate={navigate} />
+        </Layout>
       </>
     );
   }
@@ -296,11 +297,10 @@ function App() {
     return (
       <>
         <SEO title="Wie tickt die Welt? - WAMELI" />
-        {/* CookieConsent nur wenn Supabase konfiguriert */}
-        {import.meta.env.VITE_SUPABASE_URL && !import.meta.env.VITE_SUPABASE_URL.includes('xxxxxxxxxxxxx') && (
-          <CookieConsent onNavigate={navigate} />
-        )}
-        <QuestionsFirst onNavigate={navigate} />
+        <CookieConsent onNavigate={navigate} />
+        <Layout onNavigate={navigate}>
+          <QuestionsFirst onNavigate={navigate} />
+        </Layout>
       </>
     );
   }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface SEOProps {
   title?: string;
@@ -23,7 +23,7 @@ export function SEO({ title, description, keywords }: SEOProps) {
   }, [title, description, keywords, siteSettings]);
 
   const loadSiteSettings = async () => {
-    if (!supabase) return; // Supabase nicht verfügbar
+    if (!supabase || !isSupabaseConfigured()) return; // Supabase nicht verfügbar
     
     try {
       const { data } = await supabase

@@ -65,48 +65,17 @@ export function QuestionsFirst({ onNavigate }: QuestionsFirstProps) {
         return;
       }
 
-      // mapRef ist verfügbar, lade Google Maps
-      if (window.google && window.google.maps) {
-        console.log('✅ [MAPS] Google Maps bereits geladen');
-        createMap();
-      } else {
-        // Load Google Maps script
-        if (!document.querySelector('script[src*="maps.googleapis.com"]')) {
-          console.log('🔵 [MAPS] Lade Google Maps Script...');
-          const script = document.createElement('script');
-          script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-          script.async = true;
-          script.defer = true;
-          script.onload = () => {
-            console.log('✅ [MAPS] Script geladen');
-            if (window.google && window.google.maps) {
-              createMap();
-            }
-          };
-          script.onerror = (error) => {
+      // Verwende zentrale Google Maps Loader-Funktion
+      import('../lib/google-maps-loader').then(({ loadGoogleMapsAPI }) => {
+        loadGoogleMapsAPI(apiKey)
+          .then(() => {
+            console.log('✅ [MAPS] Google Maps geladen');
+            createMap();
+          })
+          .catch((error) => {
             console.error('❌ [MAPS] Fehler beim Laden der Google Maps API:', error);
-          };
-          document.head.appendChild(script);
-        } else {
-          // Script bereits vorhanden, warte auf Laden
-          console.log('🔵 [MAPS] Script bereits vorhanden, warte auf Laden...');
-          const checkGoogle = setInterval(() => {
-            if (window.google && window.google.maps) {
-              console.log('✅ [MAPS] Google Maps geladen');
-              clearInterval(checkGoogle);
-              createMap();
-            }
-          }, 100);
-          
-          // Timeout nach 10 Sekunden
-          setTimeout(() => {
-            clearInterval(checkGoogle);
-            if (!window.google) {
-              console.error('❌ [MAPS] Google Maps API konnte nicht geladen werden');
-            }
-          }, 10000);
-        }
-      }
+          });
+      });
     };
 
     // Starte Initialisierung
@@ -133,13 +102,7 @@ export function QuestionsFirst({ onNavigate }: QuestionsFirstProps) {
         tilt: currentView === '3d' ? 45 : 0,
         heading: 0,
         disableDefaultUI: true,
-        styles: [
-          {
-            featureType: "all",
-            elementType: "labels",
-            stylers: [{ visibility: "off" }]
-          }
-        ]
+        // Styles entfernt um Warnung zu vermeiden (kann über Cloud Console konfiguriert werden)
       });
 
       mapInstanceRef.current = map;
@@ -372,7 +335,7 @@ export function QuestionsFirst({ onNavigate }: QuestionsFirstProps) {
   }
 
   return (
-    <div className="grid grid-cols-[500px_1fr] h-screen relative bg-black text-white overflow-hidden">
+    <div className="grid grid-cols-[500px_1fr] min-h-[calc(100vh-4rem)] relative bg-black text-white overflow-hidden">
       {/* Debug Info */}
       {process.env.NODE_ENV === 'development' && (
         <div className="absolute top-4 left-4 text-xs text-gray-500 z-[9999]">
@@ -503,8 +466,8 @@ export function QuestionsFirst({ onNavigate }: QuestionsFirstProps) {
       </div>
 
       {/* Right Globe Container */}
-      <div className="relative w-full h-screen bg-black">
-        <div ref={mapRef} id="map" className="w-full h-full min-h-[400px]" />
+      <div className="relative w-full min-h-[calc(100vh-4rem)] bg-black">
+        <div ref={mapRef} id="map" className="w-full h-full min-h-[600px]" />
         
         {/* Loading Indicator für Karte */}
         {!mapLoaded && (

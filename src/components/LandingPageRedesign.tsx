@@ -60,20 +60,17 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
       return;
     }
 
-    if (typeof window !== 'undefined' && !window.google) {
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=maps,marker&v=beta`;
-      script.async = true;
-      script.defer = true;
-      script.onload = initGoogleEarth;
-      script.onerror = () => {
-        console.error('❌ Fehler beim Laden der Google Maps API');
-        loadLiveMoodData(); // Fallback zu Demo-Daten
-      };
-      document.head.appendChild(script);
-    } else if (window.google) {
-      initGoogleEarth();
-    }
+    // Verwende zentrale Google Maps Loader-Funktion
+    import('../lib/google-maps-loader').then(({ loadGoogleMapsAPI }) => {
+      loadGoogleMapsAPI(apiKey)
+        .then(() => {
+          initGoogleEarth();
+        })
+        .catch((error) => {
+          console.error('❌ Fehler beim Laden der Google Maps API:', error);
+          loadLiveMoodData(); // Fallback zu Demo-Daten
+        });
+    });
 
     return () => {
       // Cleanup: Animation stoppen
@@ -232,7 +229,7 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
   };
 
   return (
-    <div className="min-h-screen bg-black text-white overflow-x-hidden">
+    <div className="bg-black text-white overflow-x-hidden">
       {/* Animated Background */}
       <div className="fixed inset-0 z-0">
         <div className="absolute inset-0 bg-gradient-to-br from-purple-900/20 via-black to-blue-900/20" />
