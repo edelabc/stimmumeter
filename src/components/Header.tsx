@@ -125,7 +125,7 @@ export function Header({ onNavigate }: HeaderProps) {
   };
 
   return (
-    <header className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md shadow-sm">
+    <header className="fixed top-0 left-0 right-0 z-[10000] bg-white/90 backdrop-blur-md shadow-sm">
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           <button
@@ -135,26 +135,51 @@ export function Header({ onNavigate }: HeaderProps) {
             {siteName}
           </button>
 
-          <nav className="hidden md:flex items-center space-x-8">
-            {menuItems
-              .filter((item) => isLoggedIn ? item.title !== 'Impressum' : true)
-              .map((item) => (
+          <nav className="flex items-center space-x-8">
+            {menuItems.length > 0 ? (
+              <>
+                {menuItems
+                  .filter((item) => isLoggedIn ? item.title !== 'Impressum' : true)
+                  .map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleNavigate(item.url)}
+                      className="text-gray-700 hover:text-blue-600 font-medium transition-colors hidden md:inline-block"
+                    >
+                      {item.title}
+                    </button>
+                  ))}
+                {isLoggedIn && (
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 text-red-600 hover:text-red-700 font-medium transition-colors hidden md:flex"
+                  >
+                    <LogOut size={18} />
+                    Logout
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
                 <button
-                  key={item.id}
-                  onClick={() => handleNavigate(item.url)}
-                  className="text-gray-700 hover:text-blue-600 font-medium transition-colors"
+                  onClick={() => handleNavigate('/')}
+                  className="text-gray-700 hover:text-blue-600 font-medium transition-colors hidden md:inline-block"
                 >
-                  {item.title}
+                  Home
                 </button>
-              ))}
-            {isLoggedIn && (
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 text-red-600 hover:text-red-700 font-medium transition-colors"
-              >
-                <LogOut size={18} />
-                Logout
-              </button>
+                <button
+                  onClick={() => handleNavigate('/app')}
+                  className="text-gray-700 hover:text-blue-600 font-medium transition-colors hidden md:inline-block"
+                >
+                  App
+                </button>
+                <button
+                  onClick={() => handleNavigate('/legal/impressum')}
+                  className="text-gray-700 hover:text-blue-600 font-medium transition-colors hidden md:inline-block"
+                >
+                  Impressum
+                </button>
+              </>
             )}
           </nav>
 
@@ -171,25 +196,50 @@ export function Header({ onNavigate }: HeaderProps) {
       {isMenuOpen && (
         <div className="md:hidden bg-white border-t border-gray-100 shadow-lg">
           <nav className="container mx-auto px-4 py-4 space-y-2">
-            {menuItems
-              .filter((item) => isLoggedIn ? item.title !== 'Impressum' : true)
-              .map((item) => (
+            {menuItems.length > 0 ? (
+              <>
+                {menuItems
+                  .filter((item) => isLoggedIn ? item.title !== 'Impressum' : true)
+                  .map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => handleNavigate(item.url)}
+                      className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg font-medium transition-colors"
+                    >
+                      {item.title}
+                    </button>
+                  ))}
+                {isLoggedIn && (
+                  <button
+                    onClick={handleLogout}
+                    className="flex items-center gap-2 w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors"
+                  >
+                    <LogOut size={18} />
+                    Logout
+                  </button>
+                )}
+              </>
+            ) : (
+              <>
                 <button
-                  key={item.id}
-                  onClick={() => handleNavigate(item.url)}
+                  onClick={() => handleNavigate('/')}
                   className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg font-medium transition-colors"
                 >
-                  {item.title}
+                  Home
                 </button>
-              ))}
-            {isLoggedIn && (
-              <button
-                onClick={handleLogout}
-                className="flex items-center gap-2 w-full text-left px-4 py-3 text-red-600 hover:bg-red-50 rounded-lg font-medium transition-colors"
-              >
-                <LogOut size={18} />
-                Logout
-              </button>
+                <button
+                  onClick={() => handleNavigate('/app')}
+                  className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg font-medium transition-colors"
+                >
+                  App
+                </button>
+                <button
+                  onClick={() => handleNavigate('/legal/impressum')}
+                  className="block w-full text-left px-4 py-3 text-gray-700 hover:bg-blue-50 hover:text-blue-600 rounded-lg font-medium transition-colors"
+                >
+                  Impressum
+                </button>
+              </>
             )}
           </nav>
         </div>

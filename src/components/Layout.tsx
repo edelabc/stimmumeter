@@ -13,7 +13,7 @@ export function Layout({ children, onNavigate, showHeader = true, showFooter = t
   return (
     <div className="flex flex-col min-h-screen">
       {showHeader && <Header onNavigate={onNavigate} />}
-      <main className="flex-grow">
+      <main className={`flex-grow ${showHeader ? 'pt-16' : ''}`}>
         {children}
       </main>
       {showFooter && <Footer onNavigate={onNavigate} />}

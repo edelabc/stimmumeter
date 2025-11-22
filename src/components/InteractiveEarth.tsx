@@ -312,9 +312,33 @@ export function InteractiveEarth({ onNavigate }: InteractiveEarthProps) {
   }
 
   return (
-    <div className="grid grid-cols-[400px_1fr] min-h-[calc(100vh-4rem)] relative bg-black text-white overflow-hidden">
-      {/* Left Control Panel */}
-      <div className="bg-[rgba(15,23,42,0.95)] backdrop-blur-[20px] border-r border-white/10 p-8 overflow-y-auto relative z-[100]">
+    <div className="flex flex-col min-h-[calc(100vh-4rem)] relative bg-black text-white overflow-hidden pt-16">
+      {/* Top Menu Bar - In eigener Zeile ganz oben mit eigenem Container */}
+      <div className="fixed top-16 left-0 right-0 z-[9999] w-full bg-[rgba(15,23,42,0.98)] backdrop-blur-[20px] border-b border-white/10 px-6 py-4 flex-shrink-0 h-[73px]">
+        <div className="container mx-auto flex items-center justify-between h-full">
+          <div className="text-lg font-bold bg-gradient-to-br from-white to-gray-400 bg-clip-text text-transparent">
+            WAMELI - Interactive Earth
+          </div>
+          <div className="flex items-center gap-4">
+            {/* Heat Map Toggle */}
+            <button
+              onClick={toggleHeatMap}
+              className={`backdrop-blur-[10px] border rounded-lg py-2.5 px-5 cursor-pointer transition-all ${
+                heatMapVisible 
+                  ? 'bg-blue-500/30 border-blue-500/50 text-blue-300' 
+                  : 'bg-[rgba(15,23,42,0.95)] border-white/10 text-white hover:bg-blue-500/20 hover:border-blue-500/50'
+              }`}
+            >
+              🗺️ Heat Map {heatMapVisible ? '(Aktiv)' : ''}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Content Area - Grid Layout */}
+      <div className="grid grid-cols-[400px_1fr] flex-1 min-h-0 relative z-0 pt-[calc(4rem+73px)]">
+        {/* Left Control Panel */}
+        <div className="bg-[rgba(15,23,42,0.95)] backdrop-blur-[20px] border-r border-white/10 p-8 overflow-y-auto relative z-[100]">
         <div className="text-[1.8rem] font-bold mb-1 bg-gradient-to-br from-white to-gray-400 bg-clip-text text-transparent">
           WAMELI
         </div>
@@ -417,74 +441,62 @@ export function InteractiveEarth({ onNavigate }: InteractiveEarthProps) {
         </div>
       </div>
 
-      {/* Right Globe Container */}
-      <div className="relative w-full min-h-[calc(100vh-4rem)] bg-black">
-        {/* Google Maps Container - WICHTIG: ref muss gesetzt sein bevor useEffect läuft */}
-        {!isLoading && (
-          <div ref={mapContainerRef} className="w-full h-full min-h-[600px]" />
-        )}
-        
-        {/* Loading Indicator für Karte */}
-        {!mapLoaded && !isLoading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
-            <div className="text-center">
-              <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-              <p className="text-white text-sm">Lade Karte...</p>
-              {mapInitializing && <p className="text-white text-xs mt-2">Initialisiere Google Maps...</p>}
-            </div>
-          </div>
-        )}
-
-        {/* Avatars Overlay */}
-        <div ref={avatarsOverlayRef} className="absolute inset-0 pointer-events-none z-10">
-          {/* Mood Zones - Heat Map */}
-          {heatMapVisible && (
-            <>
-              <div 
-                className="absolute rounded-full opacity-30 blur-[20px] pointer-events-none animate-pulse"
-                style={{
-                  width: '200px',
-                  height: '200px',
-                  top: '20%',
-                  left: '30%',
-                  background: 'radial-gradient(circle, rgba(34, 197, 94, 0.6) 0%, transparent 70%)',
-                }}
-              />
-              <div 
-                className="absolute rounded-full opacity-30 blur-[20px] pointer-events-none animate-pulse"
-                style={{
-                  width: '150px',
-                  height: '150px',
-                  top: '50%',
-                  left: '60%',
-                  background: 'radial-gradient(circle, rgba(239, 68, 68, 0.6) 0%, transparent 70%)',
-                }}
-              />
-              <div 
-                className="absolute rounded-full opacity-30 blur-[20px] pointer-events-none animate-pulse"
-                style={{
-                  width: '180px',
-                  height: '180px',
-                  top: '70%',
-                  left: '20%',
-                  background: 'radial-gradient(circle, rgba(234, 179, 8, 0.6) 0%, transparent 70%)',
-                }}
-              />
-            </>
+        {/* Right Globe Container */}
+        <div className="relative w-full bg-black">
+          {/* Google Maps Container - WICHTIG: ref muss gesetzt sein bevor useEffect läuft */}
+          {!isLoading && (
+            <div ref={mapContainerRef} className="w-full h-full min-h-[600px]" />
           )}
-        </div>
+          
+          {/* Loading Indicator für Karte */}
+          {!mapLoaded && !isLoading && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black z-20">
+              <div className="text-center">
+                <div className="w-16 h-16 border-4 border-blue-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
+                <p className="text-white text-sm">Lade Karte...</p>
+                {mapInitializing && <p className="text-white text-xs mt-2">Initialisiere Google Maps...</p>}
+              </div>
+            </div>
+          )}
 
-        {/* Heat Map Toggle */}
-        <button
-          onClick={toggleHeatMap}
-          className={`absolute top-5 right-5 backdrop-blur-[10px] border rounded-lg py-2.5 px-5 cursor-pointer transition-all z-[100] ${
-            heatMapVisible 
-              ? 'bg-blue-500/30 border-blue-500/50 text-blue-300' 
-              : 'bg-[rgba(15,23,42,0.95)] border-white/10 text-white hover:bg-blue-500/20 hover:border-blue-500/50'
-          }`}
-        >
-          🗺️ Heat Map {heatMapVisible ? '(Aktiv)' : ''}
-        </button>
+          {/* Avatars Overlay */}
+          <div ref={avatarsOverlayRef} className="absolute inset-0 pointer-events-none z-10">
+            {/* Mood Zones - Heat Map */}
+            {heatMapVisible && (
+              <>
+                <div 
+                  className="absolute rounded-full opacity-30 blur-[20px] pointer-events-none animate-pulse"
+                  style={{
+                    width: '200px',
+                    height: '200px',
+                    top: '20%',
+                    left: '30%',
+                    background: 'radial-gradient(circle, rgba(34, 197, 94, 0.6) 0%, transparent 70%)',
+                  }}
+                />
+                <div 
+                  className="absolute rounded-full opacity-30 blur-[20px] pointer-events-none animate-pulse"
+                  style={{
+                    width: '150px',
+                    height: '150px',
+                    top: '50%',
+                    left: '60%',
+                    background: 'radial-gradient(circle, rgba(239, 68, 68, 0.6) 0%, transparent 70%)',
+                  }}
+                />
+                <div 
+                  className="absolute rounded-full opacity-30 blur-[20px] pointer-events-none animate-pulse"
+                  style={{
+                    width: '180px',
+                    height: '180px',
+                    top: '70%',
+                    left: '20%',
+                    background: 'radial-gradient(circle, rgba(234, 179, 8, 0.6) 0%, transparent 70%)',
+                  }}
+                />
+              </>
+            )}
+          </div>
 
         {/* Forecast Panel */}
         {showForecast && (
@@ -535,6 +547,7 @@ export function InteractiveEarth({ onNavigate }: InteractiveEarthProps) {
             </div>
           </div>
         )}
+      </div>
       </div>
 
       <style>{`
