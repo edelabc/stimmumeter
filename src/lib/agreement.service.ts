@@ -1,4 +1,6 @@
-import { supabase } from './supabase';
+// Umstellung auf MySQL-API
+import { apiClient } from './api-client';
+import { getAuthHeaders } from './auth-mysql';
 
 // Type Definitions
 export interface Vereinbarungstitel {
@@ -31,6 +33,7 @@ export interface Vereinbarung {
   gueltigkeit_bis: string | null;
   kuendigungsfrist_wert: number | null;
   kuendigungsfrist_einheit: 'Tag(e)' | 'Woche(n)' | 'Monat(e)' | 'Jahre' | null;
+  slug: string | null;
   created_at: string;
   updated_at: string;
   // Relations
@@ -84,27 +87,33 @@ export interface UpdateAgreementData extends Partial<CreateAgreementData> {
  * Get all agreement titles
  */
 export async function getAllAgreementTitles(): Promise<Vereinbarungstitel[]> {
-  const { data, error } = await supabase
-    .from('t_vereinbarungstitel')
-    .select('*')
-    .order('titel');
-
-  if (error) throw error;
-  return data || [];
+  try {
+    const response = await apiClient.get('/agreements.php?action=titles');
+    if (response.success && response.data) {
+      return response.data;
+    }
+    return [];
+  } catch (error) {
+    console.error('Error loading agreement titles:', error);
+    return [];
+  }
 }
 
 /**
  * Get agreement title by ID
  */
 export async function getAgreementTitleById(id: string): Promise<Vereinbarungstitel | null> {
-  const { data, error } = await supabase
-    .from('t_vereinbarungstitel')
-    .select('*')
-    .eq('id', id)
-    .maybeSingle();
-
-  if (error) throw error;
-  return data;
+  try {
+    const response = await apiClient.get(`/agreements.php?action=titles`);
+    if (response.success && response.data) {
+      const title = response.data.find((t: Vereinbarungstitel) => t.id === id);
+      return title || null;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error loading agreement title by ID:', error);
+    return null;
+  }
 }
 
 /**
@@ -114,23 +123,19 @@ export async function createAgreementTitle(
   titel: string,
   beschreibung?: string
 ): Promise<Vereinbarungstitel> {
-  if (!supabase) throw new Error('Supabase ist nicht konfiguriert');
-  
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user) throw new Error('User not authenticated');
-
-  const { data, error } = await supabase
-    .from('t_vereinbarungstitel')
-    .insert({
+  try {
+    const response = await apiClient.post('/agreements.php?action=createTitle', {
       titel,
       beschreibung: beschreibung || null,
-      erstellt_von_user_id: user.user.id,
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+    });
+    
+    if (response.success && response.data) {
+      return response.data;
+    }
+    throw new Error(response.error || 'Fehler beim Erstellen des Titels');
+  } catch (error: any) {
+    throw error;
+  }
 }
 
 /**
@@ -140,15 +145,19 @@ export async function updateAgreementTitle(
   id: string,
   updates: { titel?: string; beschreibung?: string; gesperrt?: boolean }
 ): Promise<Vereinbarungstitel> {
-  const { data, error } = await supabase
-    .from('t_vereinbarungstitel')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
+  try {
+    const response = await apiClient.post('/agreements.php?action=updateTitle', {
+      id,
+      ...updates,
+    });
+    
+    if (response.success && response.data) {
+      return response.data;
+    }
+    throw new Error(response.error || 'Fehler beim Aktualisieren des Titels');
+  } catch (error: any) {
+    throw error;
+  }
 }
 
 /**
@@ -165,136 +174,105 @@ export async function toggleAgreementTitleLock(
  * Delete agreement title
  */
 export async function deleteAgreementTitle(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('t_vereinbarungstitel')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
+  try {
+    const response = await apiClient.post('/agreements.php?action=deleteTitle', {
+      id,
+    });
+    
+    if (!response.success) {
+      throw new Error(response.error || 'Fehler beim Löschen des Titels');
+    }
+  } catch (error: any) {
+    throw error;
+  }
 }
 
 /**
  * Get all agreements (for admin)
  */
 export async function getAllAgreements(): Promise<Vereinbarung[]> {
-  const { data, error } = await supabase
-    .from('t_vereinbarungen')
-    .select(`
-      *,
-      titel:t_vereinbarungstitel(*)
-    `)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-  
-  // Load user data from user_profiles table
-  const userIds = new Set<string>();
-  (data || []).forEach((agreement) => {
-    if (agreement.ersteller_user_id) userIds.add(agreement.ersteller_user_id);
-    if (agreement.empfaenger_user_id) userIds.add(agreement.empfaenger_user_id);
-  });
-
-  const { data: userProfiles } = await supabase
-    .from('user_profiles')
-    .select('id, email')
-    .in('id', Array.from(userIds));
-
-  const userMap = new Map((userProfiles || []).map((u) => [u.id, u]));
-
-  return (data || []).map((agreement) => ({
-    ...agreement,
-    ersteller: agreement.ersteller_user_id
-      ? {
-          id: agreement.ersteller_user_id,
-          email: userMap.get(agreement.ersteller_user_id)?.email || '',
-          raw_user_meta_data: {},
-        }
-      : undefined,
-    empfaenger: agreement.empfaenger_user_id
-      ? {
-          id: agreement.empfaenger_user_id,
-          email: userMap.get(agreement.empfaenger_user_id)?.email || '',
-          raw_user_meta_data: {},
-        }
-      : undefined,
-  }));
+  try {
+    const response = await apiClient.get('/agreements.php?action=list');
+    if (response.success && response.data) {
+      // API gibt bereits titel_name zurück, mappen wir auf titel-Objekt
+      return response.data.map((agreement: any) => ({
+        ...agreement,
+        titel: agreement.titel_name ? {
+          id: agreement.titel_id,
+          titel: agreement.titel_name,
+          beschreibung: agreement.titel_beschreibung,
+        } : undefined,
+      }));
+    }
+    return [];
+  } catch (error) {
+    console.error('Error loading agreements:', error);
+    return [];
+  }
 }
 
 /**
  * Get agreement by ID with placeholder replacement
  */
 export async function getAgreementById(id: string, replacePlaceholders: boolean = true): Promise<Vereinbarung | null> {
-  const { data, error } = await supabase
-    .from('t_vereinbarungen')
-    .select(`
-      *,
-      titel:t_vereinbarungstitel(*)
-    `)
-    .eq('id', id)
-    .maybeSingle();
+  try {
+    const response = await apiClient.get(`/agreements.php?action=get&id=${id}`);
+    if (response.success && response.data) {
+      const data = response.data;
+      
+      // Mappe titel_name auf titel-Objekt
+      const agreementWithUsers = {
+        ...data,
+        titel: data.titel_name ? {
+          id: data.titel_id,
+          titel: data.titel_name,
+          beschreibung: data.titel_beschreibung,
+        } : undefined,
+      };
 
-  if (error) throw error;
-  if (!data) return null;
-
-  // Load user data from user_profiles table
-  const userIds: string[] = [];
-  if (data.ersteller_user_id) userIds.push(data.ersteller_user_id);
-  if (data.empfaenger_user_id) userIds.push(data.empfaenger_user_id);
-
-  const { data: userProfiles } = await supabase
-    .from('user_profiles')
-    .select('id, email')
-    .in('id', userIds);
-
-  const userMap = new Map((userProfiles || []).map((u) => [u.id, u]));
-
-  const ersteller = data.ersteller_user_id
-    ? {
-        id: data.ersteller_user_id,
-        email: userMap.get(data.ersteller_user_id)?.email || '',
-        raw_user_meta_data: {},
+      // Replace placeholders if requested
+      if (replacePlaceholders) {
+        agreementWithUsers.inhalt = await replacePlaceholdersInContent(agreementWithUsers.inhalt, agreementWithUsers);
       }
-    : undefined;
 
-  const empfaenger = data.empfaenger_user_id
-    ? {
-        id: data.empfaenger_user_id,
-        email: userMap.get(data.empfaenger_user_id)?.email || '',
-        raw_user_meta_data: {},
-      }
-    : undefined;
-
-  const agreementWithUsers = {
-    ...data,
-    ersteller,
-    empfaenger,
-  };
-
-  // Replace placeholders if requested
-  if (replacePlaceholders) {
-    agreementWithUsers.inhalt = await replacePlaceholdersInContent(agreementWithUsers.inhalt, agreementWithUsers);
+      return agreementWithUsers;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error loading agreement by ID:', error);
+    return null;
   }
-
-  return agreementWithUsers;
 }
 
 /**
- * Get agreement by slug (from menu_items)
+ * Get agreement by slug (directly from agreement or from menu_items/footer_menu_items)
  */
 export async function getAgreementBySlug(slug: string): Promise<Vereinbarung | null> {
-  // First find menu item with this slug
-  const { data: menuItem, error: menuError } = await supabase
-    .from('menu_items')
-    .select('linked_agreement_id')
-    .eq('slug', slug)
-    .eq('is_active', true)
-    .maybeSingle();
+  try {
+    const response = await apiClient.get(`/agreements.php?action=getBySlug&slug=${encodeURIComponent(slug)}`);
+    if (response.success && response.data) {
+      const data = response.data;
+      
+      // Mappe titel_name auf titel-Objekt
+      const agreementWithUsers = {
+        ...data,
+        titel: data.titel_name ? {
+          id: data.titel_id,
+          titel: data.titel_name,
+          beschreibung: data.titel_beschreibung,
+        } : undefined,
+      };
 
-  if (menuError) throw menuError;
-  if (!menuItem || !menuItem.linked_agreement_id) return null;
+      // Replace placeholders
+      agreementWithUsers.inhalt = await replacePlaceholdersInContent(agreementWithUsers.inhalt, agreementWithUsers);
 
-  // Get the agreement
-  return getAgreementById(menuItem.linked_agreement_id, true);
+      return agreementWithUsers;
+    }
+    return null;
+  } catch (error) {
+    console.error('Error loading agreement by slug:', error);
+    return null;
+  }
 }
 
 /**
@@ -303,30 +281,17 @@ export async function getAgreementBySlug(slug: string): Promise<Vereinbarung | n
 export async function createAgreement(
   agreementData: CreateAgreementData
 ): Promise<Vereinbarung> {
-  if (!supabase) throw new Error('Supabase ist nicht konfiguriert');
-  
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user) throw new Error('User not authenticated');
-
-  const { data, error } = await supabase
-    .from('t_vereinbarungen')
-    .insert({
-      ...agreementData,
-      ersteller_user_id: user.user.id,
-      empfaenger_user_id: agreementData.empfaenger_user_id || null,
-    })
-    .select(`
-      *,
-      titel:t_vereinbarungstitel(*)
-    `)
-    .single();
-
-  if (error) throw error;
-
-  // Log creation
-  await logAgreementAction(data.id, 'ERSTELLT', {});
-
-  return data;
+  try {
+    const response = await apiClient.post('/agreements.php?action=create', agreementData);
+    if (response.success && response.data) {
+      // Log creation (optional, kann später implementiert werden)
+      // await logAgreementAction(response.data.id, 'ERSTELLT', {});
+      return response.data;
+    }
+    throw new Error(response.error || 'Fehler beim Erstellen');
+  } catch (error: any) {
+    throw error;
+  }
 }
 
 /**
@@ -336,34 +301,31 @@ export async function updateAgreement(
   id: string,
   updates: UpdateAgreementData
 ): Promise<Vereinbarung> {
-  const { data, error } = await supabase
-    .from('t_vereinbarungen')
-    .update(updates)
-    .eq('id', id)
-    .select(`
-      *,
-      titel:t_vereinbarungstitel(*)
-    `)
-    .single();
-
-  if (error) throw error;
-
-  // Log update
-  await logAgreementAction(id, 'AKTUALISIERT', updates);
-
-  return data;
+  try {
+    const response = await apiClient.post(`/agreements.php?id=${id}`, { ...updates, id });
+    if (response.success && response.data) {
+      // Log update (optional)
+      // await logAgreementAction(id, 'AKTUALISIERT', updates);
+      return response.data;
+    }
+    throw new Error(response.error || 'Fehler beim Aktualisieren');
+  } catch (error: any) {
+    throw error;
+  }
 }
 
 /**
  * Delete agreement
  */
 export async function deleteAgreement(id: string): Promise<void> {
-  const { error } = await supabase
-    .from('t_vereinbarungen')
-    .delete()
-    .eq('id', id);
-
-  if (error) throw error;
+  try {
+    const response = await apiClient.delete(`/agreements.php?id=${id}`);
+    if (!response.success) {
+      throw new Error(response.error || 'Fehler beim Löschen');
+    }
+  } catch (error: any) {
+    throw error;
+  }
 }
 
 /**
@@ -373,124 +335,59 @@ export async function createAgreementVersion(
   id: string,
   updates?: Partial<CreateAgreementData>
 ): Promise<Vereinbarung> {
-  // Get original agreement
-  const original = await getAgreementById(id, false);
-  if (!original) throw new Error('Agreement not found');
-
-  // Determine parent ID (use original's parent or original itself)
-  const parentId = original.parent_vereinbarung_id || original.id;
-
-  // Get max version for this parent
-  const { data: versions } = await supabase
-    .from('t_vereinbarungen')
-    .select('version')
-    .or(`parent_vereinbarung_id.eq.${parentId},id.eq.${parentId}`);
-
-  const maxVersion = versions
-    ? Math.max(...versions.map(v => v.version || 1))
-    : original.version;
-
-  // Create new version
-  if (!supabase) throw new Error('Supabase ist nicht konfiguriert');
-  
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user) throw new Error('User not authenticated');
-
-  const newVersionData: any = {
-    titel_id: original.titel_id,
-    inhalt: updates?.inhalt || original.inhalt,
-    ersteller_user_id: original.ersteller_user_id,
-    empfaenger_user_id: updates?.empfaenger_user_id ?? original.empfaenger_user_id,
-    parent_vereinbarung_id: parentId,
-    version: maxVersion + 1,
-    status: 'Entwurf',
-    bearbeiter_von: updates?.bearbeiter_von ?? original.bearbeiter_von,
-    bearbeiter_an: updates?.bearbeiter_an ?? original.bearbeiter_an,
-    kurze_zusammenfassung: updates?.kurze_zusammenfassung ?? original.kurze_zusammenfassung,
-    anlagen: updates?.anlagen ?? original.anlagen,
-    gueltigkeit_von: updates?.gueltigkeit_von ?? original.gueltigkeit_von,
-    gueltigkeit_bis: updates?.gueltigkeit_bis ?? original.gueltigkeit_bis,
-    kuendigungsfrist_wert: updates?.kuendigungsfrist_wert ?? original.kuendigungsfrist_wert,
-    kuendigungsfrist_einheit: updates?.kuendigungsfrist_einheit ?? original.kuendigungsfrist_einheit,
-  };
-
-  const { data, error } = await supabase
-    .from('t_vereinbarungen')
-    .insert(newVersionData)
-    .select(`
-      *,
-      titel:t_vereinbarungstitel(*)
-    `)
-    .single();
-
-  if (error) throw error;
-
-  // Archive old version
-  await updateAgreement(id, { status: 'Archiviert' });
-
-  // Log version creation
-  await logAgreementAction(data.id, 'NEUE_VERSION_ERSTELLT', {
-    neue_version: data.version,
-    archivierte_version: original.version,
-    original_id: id,
-  });
-
-  return data;
+  try {
+    const response = await apiClient.post('/agreements.php?action=createVersion', {
+      id,
+      ...updates,
+    });
+    
+    if (response.success && response.data) {
+      // Mappe titel_name auf titel-Objekt
+      const agreementWithUsers = {
+        ...response.data,
+        titel: response.data.titel_name ? {
+          id: response.data.titel_id,
+          titel: response.data.titel_name,
+          beschreibung: response.data.titel_beschreibung,
+        } : undefined,
+      };
+      
+      return agreementWithUsers;
+    }
+    throw new Error(response.error || 'Fehler beim Erstellen der neuen Version');
+  } catch (error: any) {
+    throw error;
+  }
 }
 
 /**
  * Get version history for agreement
  */
 export async function getAgreementVersionHistory(id: string): Promise<Array<{ id: string; version: number; status: string; created_at: string }>> {
-  // Get current agreement
-  const current = await getAgreementById(id, false);
-  if (!current) throw new Error('Agreement not found');
-
-  // Determine root ID
-  const rootId = current.parent_vereinbarung_id || current.id;
-
-  // Get all versions
-  const { data, error } = await supabase
-    .from('t_vereinbarungen')
-    .select('id, version, status, created_at')
-    .or(`parent_vereinbarung_id.eq.${rootId},id.eq.${rootId}`)
-    .order('version', { ascending: false });
-
-  if (error) throw error;
-  return (data || []) as Array<{ id: string; version: number; status: string; created_at: string }>;
+  try {
+    const response = await apiClient.get(`/agreements.php?action=versionHistory&id=${id}`);
+    if (response.success && response.data) {
+      return response.data;
+    }
+    throw new Error(response.error || 'Fehler beim Laden der Versionshistorie');
+  } catch (error: any) {
+    throw error;
+  }
 }
 
 /**
  * Get agreement logs
  */
 export async function getAgreementLogs(id: string): Promise<VereinbarungsLog[]> {
-  const { data, error } = await supabase
-    .from('t_vereinbarungs_logs')
-    .select('*')
-    .eq('vereinbarung_id', id)
-    .order('created_at', { ascending: false });
-
-  if (error) throw error;
-
-  // Load user data
-  const userIds = [...new Set((data || []).map((log) => log.user_id))];
-  const { data: userProfiles } = await supabase
-    .from('user_profiles')
-    .select('id, email')
-    .in('id', userIds);
-
-  const userMap = new Map((userProfiles || []).map((u) => [u.id, u]));
-
-  return (data || []).map((log) => ({
-    ...log,
-    user: userMap.get(log.user_id)
-      ? {
-          id: log.user_id,
-          email: userMap.get(log.user_id)?.email || '',
-          raw_user_meta_data: {},
-        }
-      : undefined,
-  }));
+  try {
+    const response = await apiClient.get(`/agreements.php?action=logs&id=${id}`);
+    if (response.success && response.data) {
+      return response.data;
+    }
+    throw new Error(response.error || 'Fehler beim Laden der Logs');
+  } catch (error: any) {
+    throw error;
+  }
 }
 
 /**
@@ -501,34 +398,34 @@ export async function logAgreementAction(
   aktion: string,
   details?: any
 ): Promise<void> {
-  if (!supabase) throw new Error('Supabase ist nicht konfiguriert');
-  
-  const { data: user } = await supabase.auth.getUser();
-  if (!user.user) throw new Error('User not authenticated');
-
-  const { error } = await supabase
-    .from('t_vereinbarungs_logs')
-    .insert({
+  try {
+    const response = await apiClient.post('/agreements.php?action=logAction', {
       vereinbarung_id: vereinbarungId,
-      user_id: user.user.id,
       aktion,
       details: details || null,
     });
-
-  if (error) throw error;
+    
+    if (!response.success) {
+      throw new Error(response.error || 'Fehler beim Speichern des Logs');
+    }
+  } catch (error: any) {
+    throw error;
+  }
 }
 
 /**
  * Get all placeholder definitions
  */
 export async function getAllPlaceholderDefinitions(): Promise<PlatzhalterDefinition[]> {
-  const { data, error } = await supabase
-    .from('t_platzhalter_definitionen')
-    .select('*')
-    .order('platzhalter_schluessel');
-
-  if (error) throw error;
-  return data || [];
+  try {
+    const response = await apiClient.get('/agreements.php?action=placeholderDefinitions');
+    if (response.success && response.data) {
+      return response.data;
+    }
+    throw new Error(response.error || 'Fehler beim Laden der Platzhalter-Definitionen');
+  } catch (error: any) {
+    throw error;
+  }
 }
 
 /**

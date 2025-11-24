@@ -1,36 +1,15 @@
-import { createClient } from '@supabase/supabase-js';
+/**
+ * DEPRECATED: Diese Datei wird nicht mehr verwendet
+ * Alle Supabase-Funktionalität wurde auf MySQL umgestellt
+ * Diese Datei bleibt nur für Kompatibilität mit bestehenden Type-Imports
+ */
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+// Leere Exports für Kompatibilität
+export const supabase: any = null;
+export const isSupabaseConfigured = (): boolean => false;
+export const isSupabaseAvailable = (): boolean => false;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Supabase environment variables are missing');
-}
-
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
-
-// Helper-Funktion um zu prüfen ob Supabase wirklich konfiguriert ist (kein Platzhalter)
-export const isSupabaseConfigured = (): boolean => {
-  if (!supabaseUrl || !supabaseAnonKey) return false;
-  const url = supabaseUrl.toLowerCase().trim();
-  const key = supabaseAnonKey.toLowerCase().trim();
-  
-  // Prüfe auf Platzhalter
-  if (url.includes('xxxxxxxxxxxxx') || url.includes('dummy') || url.includes('placeholder')) {
-    return false;
-  }
-  if (key.includes('xxxxxxxxxxxxx') || key.includes('dummy') || key.includes('placeholder')) {
-    return false;
-  }
-  
-  // Prüfe ob URL gültig aussieht
-  if (!url.includes('.supabase.co') || !url.startsWith('https://')) {
-    return false;
-  }
-  
-  return true;
-};
-
+// Type-Definitionen (werden noch verwendet)
 export interface Pseudonym {
   id: string;
   name: string;
@@ -76,6 +55,7 @@ export interface MoodIndicator {
   icon_url?: string | null;
   category_id?: string | null;
   category?: IndicatorCategory | null;
+  description?: string | null;
 }
 
 export interface MoodEntry {
@@ -107,6 +87,7 @@ export interface MoodEntryWithValues extends MoodEntry {
     indicator_id: string;
     indicator_name: string;
     indicator_color: string;
+    indicator_description?: string | null;
     value: number;
   }>;
 }
@@ -126,3 +107,6 @@ export interface AIConfiguration {
   created_at: string;
   updated_at: string;
 }
+
+// Dummy-Type für Kompatibilität
+export type SupabaseClient = any;

@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { X, FileText, AlertCircle } from 'lucide-react';
-import { supabase } from '../lib/supabase';
 import DOMPurify from 'dompurify';
 import { marked } from 'marked';
+import { getApiBaseUrl } from '../lib/api-client';
 
 interface AITermsModalProps {
   isOpen: boolean;
@@ -28,19 +28,27 @@ export function AITermsModal({ isOpen, onClose, onAccept, provider, userId }: AI
   const loadTerms = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('legal_pages')
-        .select('content')
-        .eq('page_type', 'ai-terms')
-        .eq('is_active', true)
-        .single();
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${getApiBaseUrl()}/legal-pages.php?action=get&page_type=ai-terms`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
 
-      if (data?.content) {
-        const rawHtml = await marked(data.content);
+      const result = await response.json();
+      
+      if (result.data?.content) {
+        const rawHtml = await marked(result.data.content);
         const sanitized = DOMPurify.sanitize(rawHtml);
         setTermsContent(sanitized);
+      } else {
+        setTermsContent('<p>Keine Nutzungsbedingungen verfügbar.</p>');
       }
     } catch (err) {
       console.error('Error loading AI terms:', err);
@@ -52,15 +60,21 @@ export function AITermsModal({ isOpen, onClose, onAccept, provider, userId }: AI
 
   const checkAcceptance = async () => {
     try {
-      const { data, error } = await supabase
-        .from('ai_terms_acceptance')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('provider', provider)
-        .maybeSingle();
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${getApiBaseUrl()}/ai-configurations.php?action=check-terms&provider=${provider}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error) throw error;
-      setHasAccepted(!!data);
+      if (!response.ok) {
+        return;
+      }
+
+      const result = await response.json();
+      setHasAccepted(result.data?.accepted === true);
     } catch (err) {
       console.error('Error checking acceptance:', err);
     }
@@ -76,18 +90,29 @@ export function AITermsModal({ isOpen, onClose, onAccept, provider, userId }: AI
 
   const handleAccept = async () => {
     try {
-      const { error } = await supabase
-        .from('ai_terms_acceptance')
-        .insert({
-          user_id: userId,
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${getApiBaseUrl()}/ai-configurations.php?action=accept-terms`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           provider: provider,
           terms_version: '1.0'
-        });
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        throw new Error(`API Error: ${response.status}`);
+      }
 
-      setHasAccepted(true);
-      onAccept();
+      const result = await response.json();
+      
+      if (result.data?.accepted) {
+        setHasAccepted(true);
+        onAccept();
+      }
     } catch (err) {
       console.error('Error accepting terms:', err);
     }

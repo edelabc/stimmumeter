@@ -428,11 +428,9 @@ export function StripeConfiguration() {
             <p className="mt-2 text-sm text-gray-600">
               Die URL Ihrer App, zu der Stripe nach erfolgreicher/abgebrochener Zahlung zurückleitet.
               <br />
-              <strong>Beispiele:</strong>
+              <strong>Beispiel:</strong>
               <br />
-              • Lokal: <code className="bg-gray-100 px-1 py-0.5 rounded">http://localhost:5173</code>
-              <br />
-              • Produktion: <code className="bg-gray-100 px-1 py-0.5 rounded">https://ihre-domain.de</code>
+              • Produktion: <code className="bg-gray-100 px-1 py-0.5 rounded">https://wameli.com</code>
             </p>
           </div>
         </div>

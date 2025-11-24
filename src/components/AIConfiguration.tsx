@@ -1,8 +1,27 @@
 import { useState, useEffect } from 'react';
 import { X, Plus, Trash2, Check, Eye, EyeOff, AlertCircle, Edit2, Code, Zap } from 'lucide-react';
-import { supabase, AIConfiguration as AIConfigType } from '../lib/supabase';
 import { AITermsModal } from './AITermsModal';
 import { AIService } from '../lib/ai-service';
+import { getApiBaseUrl } from '../lib/api-client';
+
+// Type definition
+export interface AIConfiguration {
+  id: string;
+  user_id: string;
+  nickname: string;
+  provider: 'openai' | 'gemini' | 'claude' | 'xai' | 'manus';
+  model: string;
+  api_key: string;
+  text_color: string;
+  background_color: string;
+  is_active: boolean;
+  is_enabled: boolean;
+  system_prompt?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+type AIConfigType = AIConfiguration;
 
 interface AIConfigurationProps {
   isOpen: boolean;
@@ -52,13 +71,21 @@ export function AIConfiguration({ isOpen, onClose, userId }: AIConfigurationProp
 
   const loadEnabledProviders = async () => {
     try {
-      const { data, error } = await supabase
-        .from('ai_provider_settings')
-        .select('provider')
-        .eq('is_enabled', true);
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${getApiBaseUrl()}/ai-configurations.php?action=enabled-providers`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error) throw error;
-      setEnabledProviders(data?.map(p => p.provider) || []);
+      if (!response.ok) {
+        throw new Error('Fehler beim Laden der Provider');
+      }
+
+      const result = await response.json();
+      setEnabledProviders(result.data || AI_PROVIDERS.map(p => p.id));
     } catch (err) {
       console.error('Error loading enabled providers:', err);
       setEnabledProviders(AI_PROVIDERS.map(p => p.id));
@@ -68,14 +95,25 @@ export function AIConfiguration({ isOpen, onClose, userId }: AIConfigurationProp
   const loadConfigurations = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('ai_configurations')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${getApiBaseUrl()}/ai-configurations.php?action=list&user_id=${userId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error) throw error;
-      setConfigurations(data || []);
+      if (!response.ok) {
+        throw new Error('Fehler beim Laden der Konfigurationen');
+      }
+
+      const result = await response.json();
+      if (result.data) {
+        setConfigurations(result.data);
+      } else {
+        setConfigurations([]);
+      }
     } catch (err) {
       console.error('Error loading AI configurations:', err);
       setError('Fehler beim Laden der Konfigurationen');
@@ -86,15 +124,21 @@ export function AIConfiguration({ isOpen, onClose, userId }: AIConfigurationProp
 
   const checkTermsAcceptance = async (provider: string): Promise<boolean> => {
     try {
-      const { data, error } = await supabase
-        .from('ai_terms_acceptance')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('provider', provider)
-        .maybeSingle();
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${getApiBaseUrl()}/ai-configurations.php?action=check-terms&provider=${provider}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error) throw error;
-      return !!data;
+      if (!response.ok) {
+        return false;
+      }
+
+      const result = await response.json();
+      return result.data?.accepted === true;
     } catch (err) {
       console.error('Error checking terms acceptance:', err);
       return false;
@@ -120,10 +164,17 @@ export function AIConfiguration({ isOpen, onClose, userId }: AIConfigurationProp
 
   const saveConfiguration = async () => {
     try {
+      const token = localStorage.getItem('auth_token');
+      
       if (editingId) {
-        const { data, error } = await supabase
-          .from('ai_configurations')
-          .update({
+        // Update existing configuration
+        const response = await fetch(`${getApiBaseUrl()}/ai-configurations.php?action=update&id=${editingId}`, {
+          method: 'PUT',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
             nickname: formData.nickname,
             provider: formData.provider,
             model: formData.model,
@@ -132,19 +183,26 @@ export function AIConfiguration({ isOpen, onClose, userId }: AIConfigurationProp
             background_color: formData.background_color,
             is_enabled: formData.is_enabled,
             system_prompt: formData.system_prompt || null
-          })
-          .eq('id', editingId)
-          .select()
-          .single();
+          }),
+        });
 
-        if (error) throw error;
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Fehler beim Aktualisieren' }));
+          throw new Error(errorData.error || 'Fehler beim Aktualisieren');
+        }
 
-        setConfigurations(configurations.map(c => c.id === editingId ? data : c));
+        const result = await response.json();
+        setConfigurations(configurations.map(c => c.id === editingId ? result.data : c));
         setEditingId(null);
       } else {
-        const { data, error } = await supabase
-          .from('ai_configurations')
-          .insert({
+        // Create new configuration
+        const response = await fetch(`${getApiBaseUrl()}/ai-configurations.php?action=create`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
             user_id: userId,
             nickname: formData.nickname,
             provider: formData.provider,
@@ -155,13 +213,16 @@ export function AIConfiguration({ isOpen, onClose, userId }: AIConfigurationProp
             is_enabled: formData.is_enabled,
             system_prompt: formData.system_prompt || null,
             is_active: configurations.length === 0
-          })
-          .select()
-          .single();
+          }),
+        });
 
-        if (error) throw error;
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({ error: 'Fehler beim Erstellen' }));
+          throw new Error(errorData.error || 'Fehler beim Erstellen');
+        }
 
-        setConfigurations([data, ...configurations]);
+        const result = await response.json();
+        setConfigurations([result.data, ...configurations]);
       }
 
       setShowTermsModal(false);
@@ -177,9 +238,9 @@ export function AIConfiguration({ isOpen, onClose, userId }: AIConfigurationProp
         is_enabled: true,
         system_prompt: ''
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error saving configuration:', err);
-      setError('Fehler beim Speichern der Konfiguration');
+      setError(err.message || 'Fehler beim Speichern der Konfiguration');
     }
   };
 
@@ -187,58 +248,81 @@ export function AIConfiguration({ isOpen, onClose, userId }: AIConfigurationProp
     if (!confirm('Diese KI-Konfiguration wirklich löschen?')) return;
 
     try {
-      const { error } = await supabase
-        .from('ai_configurations')
-        .delete()
-        .eq('id', id);
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${getApiBaseUrl()}/ai-configurations.php?action=delete&id=${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Fehler beim Löschen' }));
+        throw new Error(errorData.error || 'Fehler beim Löschen');
+      }
+
       setConfigurations(configurations.filter(c => c.id !== id));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error deleting configuration:', err);
-      setError('Fehler beim Löschen der Konfiguration');
+      setError(err.message || 'Fehler beim Löschen der Konfiguration');
     }
   };
 
   const handleSetActive = async (id: string) => {
     try {
-      await supabase
-        .from('ai_configurations')
-        .update({ is_active: false })
-        .eq('user_id', userId);
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${getApiBaseUrl()}/ai-configurations.php?action=set-active&id=${id}`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-      const { error } = await supabase
-        .from('ai_configurations')
-        .update({ is_active: true })
-        .eq('id', id);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Fehler beim Aktivieren' }));
+        throw new Error(errorData.error || 'Fehler beim Aktivieren');
+      }
 
-      if (error) throw error;
-
+      const result = await response.json();
+      
+      // Update all configurations: set the active one and deactivate others
       setConfigurations(configurations.map(c => ({
         ...c,
         is_active: c.id === id
       })));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error setting active configuration:', err);
-      setError('Fehler beim Aktivieren der Konfiguration');
+      setError(err.message || 'Fehler beim Aktivieren der Konfiguration');
     }
   };
 
   const handleToggleEnabled = async (id: string, currentState: boolean) => {
     try {
-      const { error } = await supabase
-        .from('ai_configurations')
-        .update({ is_enabled: !currentState })
-        .eq('id', id);
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${getApiBaseUrl()}/ai-configurations.php?action=update&id=${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          is_enabled: !currentState
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Fehler beim Umschalten' }));
+        throw new Error(errorData.error || 'Fehler beim Umschalten');
+      }
 
       setConfigurations(configurations.map(c =>
         c.id === id ? { ...c, is_enabled: !currentState } : c
       ));
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error toggling enabled state:', err);
-      setError('Fehler beim Umschalten des Status');
+      setError(err.message || 'Fehler beim Umschalten des Status');
     }
   };
 

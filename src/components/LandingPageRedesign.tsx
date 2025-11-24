@@ -3,9 +3,12 @@ import {
   Globe2, Sparkles, TrendingUp, Shield, Brain, 
   Award, Users, MapPin, Activity, Zap, Star,
   ChevronRight, Play, Lock, Unlock, Heart,
-  Trophy, Coins, Target, Rocket
+  Trophy, Coins, Target, Rocket, MapPin as MapPinIcon, Navigation
 } from 'lucide-react';
-import { fetchLiveMoodData, generateDemoMoodData, type MoodDataCell } from '../lib/mood-api';
+import { sessionManager, type AssessmentData, type SessionData } from '../lib/session-manager';
+import { MoodSymbolPalette, type SymbolType } from './MoodSymbolPalette';
+import { MoodAssessmentPopup, type MoodType } from './MoodAssessmentPopup';
+import { SYMBOLS } from './MoodSymbolPalette';
 
 // Google Maps Types deklarieren
 declare global {
@@ -14,16 +17,6 @@ declare global {
   }
 }
 
-// Verwende MoodDataCell aus dem API-Service
-type MoodData = MoodDataCell;
-
-interface UserStats {
-  totalGuesses: number;
-  correctGuesses: number;
-  yraBalance: number;
-  streak: number;
-  globalRank?: number;
-}
 
 interface LandingPageRedesignProps {
   onGetStarted: () => void;
@@ -31,20 +24,87 @@ interface LandingPageRedesignProps {
 }
 
 export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPageRedesignProps) {
-  const [liveMoodData, setLiveMoodData] = useState<MoodData[]>([]);
-  const [currentGuessLocation, setCurrentGuessLocation] = useState<MoodData | null>(null);
+  // Location State
+  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [locationStatus, setLocationStatus] = useState<'none' | 'requesting' | 'granted' | 'denied'>('none');
   const [isGlobeLoaded, setIsGlobeLoaded] = useState(false);
-  const [userGuess, setUserGuess] = useState<'positive' | 'neutral' | 'negative' | null>(null);
-  const [showResult, setShowResult] = useState(false);
+  
+  // Session & YRA State
+  const [sessionData, setSessionData] = useState<SessionData | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+  const [draggedSymbol, setDraggedSymbol] = useState<SymbolType | null>(null);
+  
+  // Assessment State
+  const [showAssessmentPopup, setShowAssessmentPopup] = useState(false);
+  const [assessmentPosition, setAssessmentPosition] = useState<{ x: number; y: number } | null>(null);
+  const [pendingAssessment, setPendingAssessment] = useState<{ symbolType: SymbolType; lat: number; lng: number } | null>(null);
+  const [yraEarned, setYraEarned] = useState<number | null>(null);
+  const [showYraNotification, setShowYraNotification] = useState(false);
+  
+  // UI State
   const [scrollY, setScrollY] = useState(0);
+  const [showLocationOptions, setShowLocationOptions] = useState(true);
+  
+  // Refs
   const mapRef = useRef<HTMLDivElement>(null);
   const googleMapRef = useRef<google.maps.Map | null>(null);
-  const markersRef = useRef<google.maps.Marker[]>([]);
+  const assessmentMarkersRef = useRef<google.maps.Marker[]>([]);
   const animationFrameRef = useRef<number | null>(null);
   const autocompleteInputRef = useRef<HTMLInputElement>(null);
   const autocompleteRef = useRef<google.maps.places.Autocomplete | null>(null);
   const isUserInteractingRef = useRef<boolean>(false);
   const animationPausedRef = useRef<boolean>(false);
+  const userLocationSetRef = useRef<boolean>(false); // Verhindert Animation nach Standort-Setzung
+
+  // Session initialisieren
+  useEffect(() => {
+    const initSession = async () => {
+      await sessionManager.initializeSession();
+      const data = await sessionManager.getSessionData();
+      setSessionData(data);
+    };
+    initSession();
+  }, []);
+
+  // Session-Daten regelmäßig aktualisieren (nur wenn Backend verfügbar)
+  useEffect(() => {
+    let intervalId: NodeJS.Timeout | null = null;
+    
+    const updateSessionData = async () => {
+      try {
+        const data = await sessionManager.getSessionData();
+        setSessionData(data);
+      } catch (error: any) {
+        // Session-Fehler abfangen - wenn Session nicht existiert, initialisiere eine neue
+        if (error?.code === 'SESSION_NOT_FOUND' || error?.message?.includes('Session mit ID')) {
+          try {
+            // Versuche Session neu zu initialisieren
+            await sessionManager.initializeSession();
+            const newData = await sessionManager.getSessionData();
+            setSessionData(newData);
+          } catch (initError) {
+            // Wenn Initialisierung fehlschlägt, ignoriere Fehler (Tabelle existiert möglicherweise nicht)
+            console.warn('⚠️ [LandingPage] Session konnte nicht initialisiert werden:', initError);
+          }
+        } else {
+          // Andere Fehler loggen, aber nicht crashen lassen
+          console.warn('⚠️ [LandingPage] Fehler beim Laden der Session-Daten:', error);
+        }
+      }
+    };
+
+    // Initiales Laden
+    updateSessionData();
+
+    // Nur alle 10 Sekunden aktualisieren (reduziert Anfragen)
+    intervalId = setInterval(updateSessionData, 10000);
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, []);
 
   // Parallax-Effekt
   useEffect(() => {
@@ -58,21 +118,29 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
     const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
     
     if (!apiKey) {
-      console.warn('⚠️ Google Maps API Key nicht gefunden. Verwende Demo-Modus.');
-      // Lade Demo-Daten auch ohne Karte
-      loadLiveMoodData();
+      console.warn('⚠️ Google Maps API Key nicht gefunden.');
       return;
     }
 
     // Verwende zentrale Google Maps Loader-Funktion
+    // Nur laden wenn API-Key vorhanden ist
+    if (!apiKey || apiKey.trim() === '') {
+      console.warn('⚠️ Google Maps API Key nicht konfiguriert - 3D-Globus wird ohne Maps-Funktionalität geladen');
+      // Initialisiere trotzdem den Globe ohne Maps
+      initGoogleEarth();
+      return;
+    }
+
     import('../lib/google-maps-loader').then(({ loadGoogleMapsAPI }) => {
       loadGoogleMapsAPI(apiKey)
         .then(() => {
           initGoogleEarth();
         })
         .catch((error) => {
-          console.error('❌ Fehler beim Laden der Google Maps API:', error);
-          loadLiveMoodData(); // Fallback zu Demo-Daten
+          console.warn('⚠️ Google Maps API konnte nicht geladen werden:', error.message);
+          console.warn('3D-Globus wird ohne Maps-Funktionalität geladen');
+          // Initialisiere trotzdem den Globe ohne Maps
+          initGoogleEarth();
         });
     });
 
@@ -82,8 +150,8 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
         cancelAnimationFrame(animationFrameRef.current);
       }
       // Marker entfernen
-      markersRef.current.forEach(marker => marker.setMap(null));
-      markersRef.current = [];
+      assessmentMarkersRef.current.forEach(marker => marker.setMap(null));
+      assessmentMarkersRef.current = [];
     };
   }, []);
 
@@ -142,13 +210,15 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
         },
       ];
 
-      googleMapRef.current = new window.google.maps.Map(mapRef.current, {
+      // Wenn mapId gesetzt ist, können keine styles verwendet werden
+      // Styles müssen über Google Cloud Console konfiguriert werden
+      const mapId = import.meta.env.VITE_GOOGLE_MAPS_MAP_ID;
+      
+      const mapConfig: google.maps.MapOptions = {
         center: { lat: 20, lng: 0 },
         zoom: 2.5,
-        mapId: import.meta.env.VITE_GOOGLE_MAPS_MAP_ID || "DEMO_MAP_ID",
         heading: 0,
         tilt: 45,
-        styles: darkStyle,
         disableDefaultUI: false, // Aktiviert Zoom-Controls
         zoomControl: true,
         zoomControlOptions: {
@@ -170,24 +240,36 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
         disableDoubleClickZoom: false, // Doppelklick-Zoom aktiviert
         backgroundColor: '#000000',
         controlSize: 32,
-      });
+      };
+      
+      // Nur mapId setzen wenn vorhanden, sonst styles verwenden
+      if (mapId && mapId !== "DEMO_MAP_ID") {
+        mapConfig.mapId = mapId;
+        // Styles werden über Cloud Console konfiguriert wenn mapId vorhanden ist
+      } else {
+        // Nur styles setzen wenn keine mapId vorhanden ist
+        mapConfig.styles = darkStyle;
+      }
+      
+      googleMapRef.current = new window.google.maps.Map(mapRef.current, mapConfig);
 
       setIsGlobeLoaded(true);
       
       // Initialisiere Event-Handler für User-Interaktionen
       setupMapInteractionHandlers(googleMapRef.current);
       
+      // Click-Handler für Symbol-Platzierung
+      googleMapRef.current.addListener('click', handleMapClick);
+      
       // Initialisiere Adresssuche
       initAutocomplete();
       
-      // Starte Animation
-      animateGlobe();
-      
-      // Lade Live-Daten
-      loadLiveMoodData();
+      // Starte Animation nur wenn noch kein Standort gesetzt wurde
+      if (!userLocationSetRef.current) {
+        animateGlobe();
+      }
     } catch (error) {
       console.error('❌ Fehler beim Initialisieren der Karte:', error);
-      loadLiveMoodData(); // Fallback zu Demo-Daten
     }
   };
 
@@ -211,7 +293,8 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
       resumeTimeout = setTimeout(() => {
         isUserInteractingRef.current = false;
         animationPausedRef.current = false;
-        if (!animationFrameRef.current && googleMapRef.current) {
+        // Starte Animation nur wenn kein Standort gesetzt wurde
+        if (!animationFrameRef.current && googleMapRef.current && !userLocationSetRef.current) {
           animateGlobe();
         }
       }, 2000); // Warte 2 Sekunden nach letzter Interaktion
@@ -260,6 +343,12 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
       return;
     }
 
+    // Stoppe Animation wenn User bereits seinen Standort gesetzt hat
+    if (userLocationSetRef.current) {
+      console.log('🛑 [ANIMATION] Gestoppt - User hat Standort gesetzt');
+      return;
+    }
+
     // Wenn bereits eine Animation läuft, nicht erneut starten
     if (animationFrameRef.current) {
       return;
@@ -267,8 +356,11 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
 
     let heading = 0;
     const animate = () => {
-      // Stoppe Animation wenn pausiert oder User interagiert
-      if (!googleMapRef.current || animationPausedRef.current || isUserInteractingRef.current) {
+      // Stoppe Animation wenn pausiert, User interagiert oder Standort gesetzt wurde
+      if (!googleMapRef.current || 
+          animationPausedRef.current || 
+          isUserInteractingRef.current ||
+          userLocationSetRef.current) {
         animationFrameRef.current = null;
         return;
       }
@@ -319,6 +411,9 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
 
     try {
       // Erstelle Autocomplete
+      // HINWEIS: Google empfiehlt ab März 2025 PlaceAutocompleteElement statt Autocomplete
+      // für neue Projekte. Die alte API funktioniert weiterhin, sollte aber später migriert werden.
+      // Siehe: https://developers.google.com/maps/documentation/javascript/places-migration-overview
       autocompleteRef.current = new window.google.maps.places.Autocomplete(
         autocompleteInputRef.current,
         {
@@ -331,8 +426,26 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
       autocompleteRef.current.addListener('place_changed', () => {
         const place = autocompleteRef.current?.getPlace();
         if (place?.geometry && googleMapRef.current) {
+          const location = place.geometry.location!;
+          const loc = {
+            lat: location.lat(),
+            lng: location.lng(),
+          };
+          
+          // Stoppe Animation bevor Standort gesetzt wird
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
+          }
+          userLocationSetRef.current = true;
+          
+          // Setze User-Location
+          setUserLocation(loc);
+          setLocationStatus('granted');
+          setShowLocationOptions(false);
+          
           // Zentriere Karte auf ausgewählte Adresse
-          googleMapRef.current.setCenter(place.geometry.location!);
+          googleMapRef.current.setCenter(loc);
           googleMapRef.current.setZoom(15);
         }
       });
@@ -355,87 +468,145 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
     }
   };
 
-  const loadLiveMoodData = async () => {
-    try {
-      // Versuche API-Endpoint
-      const response = await fetchLiveMoodData('15m', 5);
-      
-      if (response.cells && response.cells.length > 0) {
-        setLiveMoodData(response.cells);
-        if (googleMapRef.current) {
-          updateMapMarkers(response.cells);
-        }
-      } else {
-        throw new Error('Keine Daten verfügbar');
-      }
-    } catch (error) {
-      console.log('📊 Verwende Demo-Daten für die Visualisierung');
-      // Fallback Demo-Daten
-      const demoData = generateDemoMoodData();
-      setLiveMoodData(demoData);
-      if (googleMapRef.current) {
-        updateMapMarkers(demoData);
-      }
-    }
-  };
 
-  const updateMapMarkers = (data: MoodData[]) => {
-    if (!googleMapRef.current || !window.google) return;
-
-    // Prüfe ob Marker-Konstruktor verfügbar ist
-    if (!window.google.maps || 
-        !window.google.maps.Marker || 
-        typeof window.google.maps.Marker !== 'function') {
-      console.warn('⚠️ [MAPS] Marker-Konstruktor ist nicht verfügbar');
+  // Location-Funktionen
+  const requestLocationPermission = () => {
+    setLocationStatus('requesting');
+    
+    if (!navigator.geolocation) {
+      setLocationStatus('denied');
+      alert('Geolocation wird von diesem Browser nicht unterstützt');
       return;
     }
 
-    // Entferne alte Marker
-    markersRef.current.forEach(marker => marker.setMap(null));
-    markersRef.current = [];
-
-    // Füge neue Marker hinzu
-    data.forEach(location => {
-      const color = location.state === 'positive' ? '#10b981' : 
-                   location.state === 'negative' ? '#ef4444' : '#6b7280';
-      
-      const marker = new window.google.maps.Marker({
-        position: { lat: location.lat, lng: location.lng },
-        map: googleMapRef.current,
-        icon: {
-          path: window.google.maps.SymbolPath.CIRCLE,
-          scale: 8 + location.count / 50,
-          fillColor: color,
-          fillOpacity: 0.8,
-          strokeColor: '#ffffff',
-          strokeWeight: 2,
-        },
-        title: `${location.city || 'Unknown'}: ${location.state}`,
-      });
-
-      marker.addListener('click', () => {
-        setCurrentGuessLocation(location);
-        setUserGuess(null);
-        setShowResult(false);
-      });
-
-      markersRef.current.push(marker);
-    });
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const loc = {
+          lat: position.coords.latitude,
+          lng: position.coords.longitude,
+        };
+        
+        // Stoppe Animation bevor Standort gesetzt wird
+        if (animationFrameRef.current) {
+          cancelAnimationFrame(animationFrameRef.current);
+          animationFrameRef.current = null;
+        }
+        userLocationSetRef.current = true;
+        
+        setUserLocation(loc);
+        setLocationStatus('granted');
+        setShowLocationOptions(false);
+        
+        // Zentriere Karte auf Standort
+        if (googleMapRef.current) {
+          googleMapRef.current.setCenter({ lat: loc.lat, lng: loc.lng });
+          googleMapRef.current.setZoom(15);
+        }
+      },
+      (error) => {
+        setLocationStatus('denied');
+        console.warn('Standortzugriff verweigert:', error);
+      }
+    );
   };
 
-  const handleGuess = (guess: 'positive' | 'neutral' | 'negative') => {
-    if (!currentGuessLocation) return;
-    
-    setUserGuess(guess);
-    setShowResult(true);
-    
-    // Hier würde die Guess-Verifizierung stattfinden
-    const isCorrect = guess === currentGuessLocation.state;
-    
-    if (isCorrect) {
-      // Award YRA tokens
-      console.log('Richtig geraten! +10 YRA');
+  // Drag & Drop Handler
+  const handleSymbolDragStart = (symbolType: SymbolType) => {
+    setIsDragging(true);
+    setDraggedSymbol(symbolType);
+  };
+
+  const handleSymbolDragEnd = () => {
+    setIsDragging(false);
+    setDraggedSymbol(null);
+  };
+
+  // Karten-Click Handler für Symbol-Platzierung
+  const handleMapClick = (e: google.maps.MapMouseEvent) => {
+    if (!isDragging || !draggedSymbol || !e.latLng) return;
+
+    const lat = e.latLng.lat();
+    const lng = e.latLng.lng();
+
+    // Konvertiere Karten-Koordinaten zu Bildschirm-Koordinaten für Popup
+    if (googleMapRef.current && mapRef.current && e.domEvent) {
+      // Verwende direkt die DOM-Event-Koordinaten
+      const domEvent = e.domEvent as MouseEvent;
+      const x = domEvent.clientX;
+      const y = domEvent.clientY;
+
+      setPendingAssessment({ symbolType: draggedSymbol, lat, lng });
+      setAssessmentPosition({ x, y });
+      setShowAssessmentPopup(true);
+      setIsDragging(false);
+      setDraggedSymbol(null);
     }
+  };
+
+  // Assessment bestätigen
+  const handleAssessmentConfirm = async (mood: MoodType, intensity?: number) => {
+    if (!pendingAssessment) return;
+
+    const assessment: AssessmentData = {
+      symbolType: pendingAssessment.symbolType,
+      latitude: pendingAssessment.lat,
+      longitude: pendingAssessment.lng,
+      mood,
+      intensity,
+    };
+
+    const result = await sessionManager.saveAssessment(assessment);
+
+    if (result.success && result.yraEarned) {
+      setYraEarned(result.yraEarned);
+      setShowYraNotification(true);
+      
+      // Update Session-Daten
+      const updatedData = await sessionManager.getSessionData();
+      setSessionData(updatedData);
+      
+      // Füge Marker zur Karte hinzu
+      addAssessmentMarker(pendingAssessment.lat, pendingAssessment.lng, mood, pendingAssessment.symbolType);
+      
+      // Verstecke Notification nach 3 Sekunden
+      setTimeout(() => {
+        setShowYraNotification(false);
+        setYraEarned(null);
+      }, 3000);
+    } else if (result.error) {
+      alert(result.error);
+    }
+
+    setShowAssessmentPopup(false);
+    setPendingAssessment(null);
+    setAssessmentPosition(null);
+  };
+
+  // Marker zur Karte hinzufügen
+  const addAssessmentMarker = (lat: number, lng: number, mood: MoodType, symbolType: SymbolType) => {
+    if (!googleMapRef.current || !window.google) return;
+
+    const symbol = SYMBOLS.find(s => s.type === symbolType);
+    const emoji = symbol?.emoji || '👤';
+    
+    const color = mood === 'positive' ? '#10b981' : 
+                 mood === 'negative' ? '#ef4444' : '#6b7280';
+
+    const marker = new window.google.maps.Marker({
+      position: { lat, lng },
+      map: googleMapRef.current,
+      icon: {
+        path: window.google.maps.SymbolPath.CIRCLE,
+        scale: 12,
+        fillColor: color,
+        fillOpacity: 0.8,
+        strokeColor: '#ffffff',
+        strokeWeight: 2,
+      },
+      title: `${emoji} ${mood}`,
+    });
+
+    assessmentMarkersRef.current.push(marker);
   };
 
   return (
@@ -451,22 +622,55 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
       <section className="relative min-h-screen flex items-center justify-center">
         {/* 3D Globus Container */}
         <div className="absolute inset-0 z-10">
-          {/* Adresssuche-Eingabefeld */}
-          {isGlobeLoaded && (
-            <div className="absolute top-20 left-4 z-[20] bg-black/80 backdrop-blur-md rounded-lg p-2 border border-white/20">
-              <input
-                ref={autocompleteInputRef}
-                type="text"
-                placeholder="🔍 Adresse suchen..."
-                className="w-[300px] px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50"
+          {/* Symbol-Palette Sidebar */}
+          {userLocation && isGlobeLoaded && (
+            <div className="absolute left-4 top-1/2 transform -translate-y-1/2 z-[20] w-[280px]">
+              <MoodSymbolPalette
+                onSymbolDragStart={handleSymbolDragStart}
+                onSymbolDragEnd={handleSymbolDragEnd}
+                isDragging={isDragging}
+                disabled={!userLocation}
               />
             </div>
           )}
-          <div ref={mapRef} className="w-full h-full opacity-80" />
+          
+          {/* Karte */}
+          <div 
+            ref={mapRef} 
+            className={`w-full h-full opacity-80 ${isDragging ? 'cursor-crosshair' : ''}`}
+          />
           
           {/* Overlay mit Interaktion */}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent pointer-events-none" />
+          
+          {/* Drag-Hinweis */}
+          {isDragging && draggedSymbol && (
+            <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[30] bg-black/90 backdrop-blur-xl rounded-2xl p-6 border border-blue-500/50 animate-pulse">
+              <div className="text-center">
+                <div className="text-4xl mb-2">
+                  {SYMBOLS.find(s => s.type === draggedSymbol)?.emoji}
+                </div>
+                <div className="text-lg font-semibold text-white">
+                  Klicke auf die Karte, um das Symbol zu platzieren
+                </div>
+              </div>
+            </div>
+          )}
         </div>
+        
+        {/* Assessment Popup */}
+        {showAssessmentPopup && assessmentPosition && pendingAssessment && (
+          <MoodAssessmentPopup
+            symbolType={pendingAssessment.symbolType}
+            position={assessmentPosition}
+            onClose={() => {
+              setShowAssessmentPopup(false);
+              setPendingAssessment(null);
+              setAssessmentPosition(null);
+            }}
+            onConfirm={handleAssessmentConfirm}
+          />
+        )}
 
         {/* Hero Content */}
         <div className="relative z-20 text-center px-4 max-w-6xl mx-auto"
@@ -482,76 +686,82 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
 
           <h1 className="text-5xl md:text-7xl font-bold mb-6 animate-fade-in">
             <span className="bg-clip-text text-transparent bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 animate-gradient">
-              Fühle den Puls der Welt
+              Erfasse die Stimmung deines Umfelds
             </span>
           </h1>
 
           <p className="text-xl md:text-2xl text-gray-300 mb-8 animate-slide-up">
-            Rate die Stimmung von Menschen weltweit in Echtzeit.<br/>
-            <span className="text-yellow-400 font-semibold">Sammle YRA-Coins</span> und werde zum globalen Emotions-Experten!
+            Platziere Symbole auf der Karte und bewerte die Stimmung der Menschen um dich herum.<br/>
+            <span className="text-yellow-400 font-semibold">Sammle YRA-Coins</span> für jede Einschätzung!
           </p>
 
-          {/* Quick Play Demo */}
-          {currentGuessLocation && (
-            <div className="bg-black/80 backdrop-blur-xl rounded-3xl p-6 mb-8 border border-purple-500/30 animate-slide-up">
-              <div className="flex items-center justify-center gap-3 mb-4">
-                <MapPin className="text-blue-400" />
-                <h3 className="text-2xl font-bold">
-                  {currentGuessLocation.city || 'Geheime Location'}, {currentGuessLocation.country}
-                </h3>
+          {/* Location Selection */}
+          {showLocationOptions && (
+            <div className="bg-black/80 backdrop-blur-xl rounded-3xl p-6 mb-8 border border-purple-500/30 animate-slide-up max-w-2xl mx-auto">
+              <div className="text-center mb-6">
+                <h3 className="text-2xl font-bold mb-2">📍 Wo befindest du dich?</h3>
+                <p className="text-gray-400">Wähle deinen Standort, um zu beginnen</p>
               </div>
               
-              <p className="text-gray-400 mb-6">
-                <Activity className="inline mr-2" size={16} />
-                {currentGuessLocation.count} aktuelle Stimmungs-Einträge
-              </p>
-
-              {!showResult ? (
-                <div>
-                  <p className="text-lg mb-4 text-yellow-300">
-                    🎯 Wie ist die Stimmung dort gerade?
-                  </p>
-                  <div className="grid grid-cols-3 gap-4">
+              <div className="grid md:grid-cols-2 gap-4">
                     <button
-                      onClick={() => handleGuess('positive')}
-                      className="py-3 px-6 bg-green-600/20 border-2 border-green-500 rounded-xl hover:bg-green-600/40 transition-all transform hover:scale-105"
+                  onClick={requestLocationPermission}
+                  disabled={locationStatus === 'requesting'}
+                  className="py-4 px-6 bg-gradient-to-r from-blue-600 to-blue-800 rounded-xl hover:from-blue-700 hover:to-blue-900 transition-all transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
                     >
-                      😊 Positiv
+                  <Navigation size={24} />
+                  <span className="font-semibold">
+                    {locationStatus === 'requesting' ? 'Lade Standort...' : 'Meinen Standort verwenden'}
+                  </span>
                     </button>
-                    <button
-                      onClick={() => handleGuess('neutral')}
-                      className="py-3 px-6 bg-gray-600/20 border-2 border-gray-500 rounded-xl hover:bg-gray-600/40 transition-all transform hover:scale-105"
-                    >
-                      😐 Neutral
-                    </button>
-                    <button
-                      onClick={() => handleGuess('negative')}
-                      className="py-3 px-6 bg-red-600/20 border-2 border-red-500 rounded-xl hover:bg-red-600/40 transition-all transform hover:scale-105"
-                    >
-                      😔 Negativ
-                    </button>
+                
+                <div className="relative">
+                  <input
+                    ref={autocompleteInputRef}
+                    type="text"
+                    placeholder="🔍 Adresse eingeben..."
+                    className="w-full py-4 px-6 bg-white/10 border border-white/20 rounded-xl text-white placeholder-gray-400 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/50"
+                    onFocus={() => {
+                      if (googleMapRef.current && autocompleteRef.current) {
+                        // Autocomplete wird automatisch initialisiert
+                      }
+                    }}
+                  />
                   </div>
                 </div>
-              ) : (
-                <div className="text-center animate-fade-in">
-                  {userGuess === currentGuessLocation.state ? (
-                    <div className="text-green-400">
-                      <Trophy size={48} className="mx-auto mb-2" />
-                      <p className="text-2xl font-bold">Richtig! +10 YRA 🎉</p>
-                    </div>
-                  ) : (
-                    <div className="text-red-400">
-                      <p className="text-xl">Leider falsch. Die Stimmung war {currentGuessLocation.state}</p>
                     </div>
                   )}
-                  <button
-                    onClick={() => loadLiveMoodData()}
-                    className="mt-4 py-2 px-6 bg-purple-600 rounded-xl hover:bg-purple-700 transition-all"
-                  >
-                    Nächste Location →
-                  </button>
+
+          {/* YRA Balance Display */}
+          {sessionData && (
+            <div className="bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-xl rounded-2xl p-4 mb-8 border border-yellow-500/30 max-w-md mx-auto animate-slide-up">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm text-gray-400">Deine Session</div>
+                  <div className="text-2xl font-bold text-yellow-400">
+                    {sessionData.yraBalance} YRA
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-sm text-gray-400">Einschätzungen</div>
+                  <div className="text-xl font-semibold text-white">
+                    {sessionData.assessmentsCount}
+                  </div>
+                </div>
+              </div>
                 </div>
               )}
+
+          {/* YRA Notification */}
+          {showYraNotification && yraEarned && (
+            <div className="fixed top-20 left-1/2 transform -translate-x-1/2 z-[2000] bg-gradient-to-r from-green-500 to-emerald-500 rounded-2xl p-6 shadow-2xl animate-bounce">
+              <div className="flex items-center gap-3">
+                <Trophy size={32} className="text-white" />
+                <div>
+                  <div className="text-xl font-bold text-white">+{yraEarned} YRA!</div>
+                  <div className="text-sm text-white/90">Einschätzung gespeichert</div>
+                </div>
+              </div>
             </div>
           )}
 
@@ -602,11 +812,11 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
               <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all" />
               <div className="relative bg-gray-900/80 backdrop-blur-xl p-8 rounded-2xl border border-purple-500/30 hover:border-purple-500/60 transition-all">
                 <div className="w-16 h-16 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center mb-6">
-                  <Target size={32} />
+                  <MapPinIcon size={32} />
                 </div>
-                <h3 className="text-2xl font-bold mb-3">1. Location wählen</h3>
+                <h3 className="text-2xl font-bold mb-3">1. Standort wählen</h3>
                 <p className="text-gray-400">
-                  Klicke auf einen pulsierenden Punkt auf dem 3D-Globus und entdecke Städte weltweit
+                  Gib deinen Standort frei oder tippe eine Adresse ein, um zu beginnen
                 </p>
               </div>
             </div>
@@ -616,11 +826,11 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
               <div className="absolute inset-0 bg-gradient-to-r from-green-600/20 to-teal-600/20 rounded-2xl blur-xl group-hover:blur-2xl transition-all" />
               <div className="relative bg-gray-900/80 backdrop-blur-xl p-8 rounded-2xl border border-green-500/30 hover:border-green-500/60 transition-all">
                 <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-teal-500 rounded-full flex items-center justify-center mb-6">
-                  <Brain size={32} />
+                  <Users size={32} />
                 </div>
-                <h3 className="text-2xl font-bold mb-3">2. Stimmung raten</h3>
+                <h3 className="text-2xl font-bold mb-3">2. Symbole platzieren</h3>
                 <p className="text-gray-400">
-                  Nutze deine Intuition und rate: Positiv, Neutral oder Negativ?
+                  Ziehe Symbole (Frau, Mann, Kind, Familie, Gruppe) auf die Karte und bewerte die Stimmung
                 </p>
               </div>
             </div>
@@ -634,7 +844,7 @@ export function LandingPageRedesign({ onGetStarted, onNavigateToOld }: LandingPa
                 </div>
                 <h3 className="text-2xl font-bold mb-3">3. YRA verdienen</h3>
                 <p className="text-gray-400">
-                  Jede richtige Antwort bringt dir YRA-Coins für exklusive Features!
+                  Für jede Einschätzung erhältst du YRA-Coins! Später kannst du sie zu deinem Account hinzufügen
                 </p>
               </div>
             </div>

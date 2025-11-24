@@ -11,7 +11,7 @@ import { LegalPageViewer } from './components/LegalPageViewer';
 import { DocumentViewer } from './components/DocumentViewer';
 import { AgreementViewer } from './components/AgreementViewer';
 import { AdminDashboard } from './components/admin/AdminDashboard';
-import { MoodApp } from './MoodApp';
+import { MoodApp } from './MoodApp.tsx';
 import { PaymentSuccess } from './components/PaymentSuccess';
 import { PaymentCancel } from './components/PaymentCancel';
 import { CookieConsent } from './components/CookieConsent';
@@ -40,7 +40,7 @@ function App() {
     const currentUser = await getCurrentUser();
 
     // Check if user is blocked
-    if (currentUser) {
+    if (currentUser && supabase) {
       try {
         const { data: profile } = await supabase
           .from('user_profiles')

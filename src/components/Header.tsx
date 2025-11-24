@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Menu, X, LogOut } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { signOut } from '../lib/auth';
+import { signOut, getCurrentUser } from '../lib/auth';
+import { getApiBaseUrl } from '../lib/api-client';
 
 interface MenuItem {
   id: string;
@@ -24,88 +24,92 @@ export function Header({ onNavigate }: HeaderProps) {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
-    if (!supabase || !isSupabaseConfigured()) return; // Supabase nicht verfügbar
-    
     loadMenuItems();
     loadSiteSettings();
     checkAuthStatus();
 
-    const { data: authListener } = supabase.auth.onAuthStateChange(() => {
+    // Listen for auth changes via storage event (when token changes)
+    const handleStorageChange = () => {
       loadMenuItems();
       checkAuthStatus();
-    });
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    // Also check periodically for auth changes
+    const interval = setInterval(() => {
+      checkAuthStatus();
+    }, 5000); // Check every 5 seconds
 
     return () => {
-      authListener.subscription.unsubscribe();
+      window.removeEventListener('storage', handleStorageChange);
+      clearInterval(interval);
     };
   }, []);
 
   const checkAuthStatus = async () => {
-    if (!supabase || !isSupabaseConfigured()) return;
-    
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      setIsLoggedIn(!!session);
+      const user = await getCurrentUser();
+      setIsLoggedIn(!!user);
     } catch (error) {
       console.warn('Fehler beim Prüfen des Auth-Status:', error);
+      setIsLoggedIn(false);
     }
   };
 
   const loadMenuItems = async () => {
-    if (!supabase || !isSupabaseConfigured()) return;
-    
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      const isAuthenticated = !!session;
+      const token = localStorage.getItem('auth_token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
       
-      // Check if user is admin
-      let isAdmin = false;
-      if (isAuthenticated && session?.user) {
-        const { data: adminCheck } = await supabase
-          .from('admin_users')
-          .select('user_id')
-          .eq('user_id', session.user.id)
-          .maybeSingle();
-        isAdmin = !!adminCheck;
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
       }
 
-      // Build query based on role
-      let query = supabase
-        .from('menu_items')
-        .select('*')
-        .eq('is_active', true)
-        .order('position');
+      const response = await fetch(`${getApiBaseUrl()}/menu-items.php?action=list`, {
+        method: 'GET',
+        headers,
+      });
 
-      // Filter by required_role
-      if (!isAuthenticated) {
-        // Public users can only see public items
-        query = query.eq('required_role', 'public');
-      } else if (!isAdmin) {
-        // Authenticated non-admin users can see public and user items
-        query = query.in('required_role', ['public', 'user']);
+      if (!response.ok) {
+        throw new Error('Fehler beim Laden der Menu-Items');
       }
-      // Admins can see all items (no filter)
 
-      const { data } = await query;
-
-      if (data) setMenuItems(data);
+      const result = await response.json();
+      
+      if (result.data) {
+        setMenuItems(result.data);
+      }
     } catch (error) {
       console.warn('Fehler beim Laden der Menu-Items:', error);
+      // Fallback: Setze leeres Array bei Fehler
+      setMenuItems([]);
     }
   };
 
   const loadSiteSettings = async () => {
-    if (!supabase) return;
-    
     try {
-      const { data } = await supabase
-        .from('site_settings')
-        .select('site_name')
-        .single();
+      const response = await fetch(`${getApiBaseUrl()}/site-settings.php`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
 
-      if (data) setSiteName(data.site_name);
+      if (!response.ok) {
+        throw new Error('Fehler beim Laden der Site-Settings');
+      }
+
+      const result = await response.json();
+      
+      if (result.data?.site_name) {
+        setSiteName(result.data.site_name);
+      }
     } catch (error) {
       console.warn('Fehler beim Laden der Site-Settings:', error);
+      // Fallback: Behalte Standard-Namen
     }
   };
 

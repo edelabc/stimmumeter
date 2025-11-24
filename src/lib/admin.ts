@@ -1,29 +1,71 @@
+// MySQL-basierte Admin-Prüfung
+import { getCurrentUser } from './auth-mysql';
+import { apiClient, getApiBaseUrl } from './api-client';
 import { supabase, isSupabaseConfigured } from './supabase';
 
-export async function isAdmin(userId: string): Promise<boolean> {
-  if (!isSupabaseConfigured() || !supabase) return false;
-  
-  try {
-    const { data } = await supabase
-      .from('admin_users')
-      .select('user_id')
-      .eq('user_id', userId)
-      .maybeSingle();
+// API Base URL dynamisch bestimmen
+const API_BASE_URL = (): string => getApiBaseUrl();
 
-    return !!data;
+/**
+ * Prüft ob ein Benutzer Admin ist
+ */
+export async function isAdmin(userId: string): Promise<boolean> {
+  try {
+    // Hole aktuellen Benutzer
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.id !== userId) {
+      return false;
+    }
+
+    // Prüfe Admin-Status via API
+    const response = await fetch(`${API_BASE_URL()}/auth.php?action=is-admin`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('auth_token') || ''}`,
+      },
+    });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const data = await response.json();
+    return data.success && data.data?.isAdmin === true;
   } catch (error) {
     console.warn('Fehler beim Prüfen der Admin-Rechte:', error);
     return false;
   }
 }
 
+/**
+ * Prüft ob der aktuell eingeloggte Benutzer Admin ist
+ */
 export async function checkCurrentUserIsAdmin(): Promise<boolean> {
-  if (!isSupabaseConfigured() || !supabase) return false;
-  
   try {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return false;
-    return isAdmin(user.id);
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return false;
+    }
+
+    // Prüfe Admin-Status via API
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      return false;
+    }
+
+    const response = await fetch(`${API_BASE_URL()}/auth.php?action=is-admin`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+    });
+
+    if (!response.ok) {
+      return false;
+    }
+
+    const data = await response.json();
+    return data.success && data.data?.isAdmin === true;
   } catch (error) {
     console.warn('Fehler beim Prüfen der Admin-Rechte:', error);
     return false;

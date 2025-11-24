@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { apiClient } from './api-client';
 
 export interface Currency {
   code: string;
@@ -203,283 +203,336 @@ export interface HelpText {
 }
 
 export async function getAllCurrencies() {
-  const { data, error } = await supabase
-    .from('currencies')
-    .select('*')
-    .order('code');
-  return { data, error };
+  try {
+    const response = await apiClient.get('/billing.php?action=currencies');
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden der Währungen') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function createCurrency(currency: Omit<Currency, 'created_at' | 'updated_at'>) {
-  const { data, error } = await supabase
-    .from('currencies')
-    .insert(currency)
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.post('/billing.php?action=currencies', currency);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Erstellen der Währung') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function updateCurrency(code: string, updates: Partial<Currency>) {
-  const { data, error } = await supabase
-    .from('currencies')
-    .update(updates)
-    .eq('code', code)
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.put(`/billing.php?action=currency&code=${encodeURIComponent(code)}`, updates);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Aktualisieren der Währung') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getAllExchangeRates() {
-  const { data, error } = await supabase
-    .from('exchange_rates')
-    .select('*')
-    .order('valid_from', { ascending: false });
-  return { data, error };
+  try {
+    const response = await apiClient.get('/billing.php?action=exchange-rates');
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden der Wechselkurse') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function createExchangeRate(rate: Omit<ExchangeRate, 'id' | 'created_at' | 'created_by'>) {
-  const { data, error } = await supabase
-    .from('exchange_rates')
-    .insert(rate)
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.post('/billing.php?action=exchange-rates', rate);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Erstellen des Wechselkurses') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getAllPricingPlans() {
-  const { data, error } = await supabase
-    .from('pricing_plans')
-    .select('*')
-    .order('sort_order');
-  return { data, error };
+  try {
+    const response = await apiClient.get('/billing.php?action=pricing-plans');
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden der Preispläne') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getActivePricingPlans() {
-  const { data, error } = await supabase
-    .from('pricing_plans')
-    .select('*')
-    .eq('is_active', true)
-    .order('sort_order');
-  return { data, error };
+  try {
+    const response = await apiClient.get('/billing.php?action=pricing-plans&active_only=1');
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden der aktiven Preispläne') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function createPricingPlan(plan: Omit<PricingPlan, 'id' | 'created_at' | 'updated_at'>) {
-  const { data, error } = await supabase
-    .from('pricing_plans')
-    .insert(plan)
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.post('/billing.php?action=pricing-plans', plan);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Erstellen des Preisplans') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function updatePricingPlan(id: string, updates: Partial<PricingPlan>) {
-  const { data, error } = await supabase
-    .from('pricing_plans')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.put(`/billing.php?action=pricing-plan&id=${encodeURIComponent(id)}`, updates);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Aktualisieren des Preisplans') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function deletePricingPlan(id: string) {
-  const { data, error } = await supabase
-    .from('pricing_plans')
-    .delete()
-    .eq('id', id);
-  return { data, error };
+  try {
+    const response = await apiClient.delete(`/billing.php?action=pricing-plan&id=${encodeURIComponent(id)}`);
+    return { data: response.data, error: null };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getPlanTrialConfig(planId: string) {
-  const { data, error } = await supabase
-    .from('plan_trial_config')
-    .select('*')
-    .eq('plan_id', planId)
-    .maybeSingle();
-  return { data, error };
+  try {
+    const response = await apiClient.get(`/billing.php?action=plan-trial-config&plan_id=${encodeURIComponent(planId)}`);
+    return { data: response.data || null, error: null };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function upsertPlanTrialConfig(config: Omit<PlanTrialConfig, 'id'>) {
-  const { data, error } = await supabase
-    .from('plan_trial_config')
-    .upsert(config, { onConflict: 'plan_id' })
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.post(`/billing.php?action=plan-trial-config&plan_id=${encodeURIComponent(config.plan_id)}`, config);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Speichern der Trial-Konfiguration') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getPlanTrialLimits(trialConfigId: string) {
-  const { data, error } = await supabase
-    .from('plan_trial_limits')
-    .select('*')
-    .eq('trial_config_id', trialConfigId)
-    .maybeSingle();
-  return { data, error };
+  try {
+    const response = await apiClient.get(`/billing.php?action=plan-trial-limits&trial_config_id=${encodeURIComponent(trialConfigId)}`);
+    return { data: response.data || null, error: null };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function upsertPlanTrialLimits(limits: Omit<PlanTrialLimits, 'id'>) {
-  const { data, error } = await supabase
-    .from('plan_trial_limits')
-    .upsert(limits, { onConflict: 'trial_config_id' })
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.post(`/billing.php?action=plan-trial-limits&trial_config_id=${encodeURIComponent(limits.trial_config_id)}`, limits);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Speichern der Trial-Limits') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getPlanSubscriptionConfig(planId: string) {
-  const { data, error } = await supabase
-    .from('plan_subscription_config')
-    .select('*')
-    .eq('plan_id', planId)
-    .maybeSingle();
-  return { data, error };
+  try {
+    const response = await apiClient.get(`/billing.php?action=plan-subscription-config&plan_id=${encodeURIComponent(planId)}`);
+    return { data: response.data || null, error: null };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function upsertPlanSubscriptionConfig(config: Omit<PlanSubscriptionConfig, 'id'>) {
-  const { data, error } = await supabase
-    .from('plan_subscription_config')
-    .upsert(config, { onConflict: 'plan_id' })
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.post(`/billing.php?action=plan-subscription-config&plan_id=${encodeURIComponent(config.plan_id)}`, config);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Speichern der Subscription-Konfiguration') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getPlanSubscriptionLimits(subscriptionConfigId: string) {
-  const { data, error } = await supabase
-    .from('plan_subscription_limits')
-    .select('*')
-    .eq('subscription_config_id', subscriptionConfigId)
-    .maybeSingle();
-  return { data, error };
+  try {
+    const response = await apiClient.get(`/billing.php?action=plan-subscription-limits&subscription_config_id=${encodeURIComponent(subscriptionConfigId)}`);
+    return { data: response.data || null, error: null };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function upsertPlanSubscriptionLimits(limits: Omit<PlanSubscriptionLimits, 'id'>) {
-  const { data, error } = await supabase
-    .from('plan_subscription_limits')
-    .upsert(limits, { onConflict: 'subscription_config_id' })
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.post(`/billing.php?action=plan-subscription-limits&subscription_config_id=${encodeURIComponent(limits.subscription_config_id)}`, limits);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Speichern der Subscription-Limits') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getAllBillingItemTypes() {
-  const { data, error } = await supabase
-    .from('billing_item_types')
-    .select('*')
-    .order('sort_order');
-  return { data, error };
+  try {
+    const response = await apiClient.get('/billing.php?action=billing-item-types');
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden der Billing-Item-Typen') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getPlanBillingItems(planId: string) {
-  const { data, error } = await supabase
-    .from('plan_billing_items')
-    .select(`
-      *,
-      item_type:billing_item_types(*)
-    `)
-    .eq('plan_id', planId);
-  return { data, error };
+  try {
+    const response = await apiClient.get(`/billing.php?action=plan-billing-items&plan_id=${encodeURIComponent(planId)}`);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden der Plan-Billing-Items') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function upsertPlanBillingItem(item: Omit<PlanBillingItem, 'id'>) {
-  const { data, error } = await supabase
-    .from('plan_billing_items')
-    .upsert(item, { onConflict: 'plan_id,billing_item_type_id' })
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.post(`/billing.php?action=plan-billing-items&plan_id=${encodeURIComponent(item.plan_id)}`, item);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Speichern des Plan-Billing-Items') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function deletePlanBillingItem(id: string) {
-  const { data, error } = await supabase
-    .from('plan_billing_items')
-    .delete()
-    .eq('id', id);
-  return { data, error };
+  try {
+    const response = await apiClient.delete(`/billing.php?action=plan-billing-item&id=${encodeURIComponent(id)}`);
+    return { data: response.data, error: null };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getUserSubscription(userId: string) {
-  const { data, error } = await supabase
-    .from('user_subscriptions')
-    .select(`
-      *,
-      plan:pricing_plans(*)
-    `)
-    .eq('user_id', userId)
-    .in('status', ['trial', 'active'])
-    .maybeSingle();
-  return { data, error };
+  try {
+    const response = await apiClient.get(`/billing.php?action=user-subscription&user_id=${encodeURIComponent(userId)}`);
+    return { data: response.data || null, error: null };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getUserInvoices(userId: string) {
-  const { data, error } = await supabase
-    .from('invoices')
-    .select(`
-      *,
-      items:invoice_items(*)
-    `)
-    .eq('user_id', userId)
-    .order('issue_date', { ascending: false });
-  return { data, error };
+  try {
+    const response = await apiClient.get(`/billing.php?action=invoices&user_id=${encodeURIComponent(userId)}`);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden der Rechnungen') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getUserUsageRecords(userId: string, startDate: string, endDate: string) {
-  const { data, error } = await supabase
-    .from('usage_records')
-    .select(`
-      *,
-      item_type:billing_item_types(*)
-    `)
-    .eq('user_id', userId)
-    .gte('recorded_at', startDate)
-    .lte('recorded_at', endDate)
-    .order('recorded_at', { ascending: false });
-  return { data, error };
+  try {
+    const response = await apiClient.get(`/billing.php?action=usage-records&user_id=${encodeURIComponent(userId)}&start_date=${encodeURIComponent(startDate)}&end_date=${encodeURIComponent(endDate)}`);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden der Nutzungsdaten') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getAllHelpTexts() {
-  const { data, error } = await supabase
-    .from('help_texts')
-    .select('*')
-    .order('code');
-  return { data, error };
+  try {
+    const response = await apiClient.get('/billing.php?action=help-texts');
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden der Hilfe-Texte') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getHelpText(code: string) {
-  const { data, error } = await supabase
-    .from('help_texts')
-    .select('*')
-    .eq('code', code)
-    .eq('is_active', true)
-    .maybeSingle();
-  return { data, error };
+  try {
+    const response = await apiClient.get(`/billing.php?action=help-texts&code=${encodeURIComponent(code)}`);
+    return { data: response.data || null, error: null };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function createHelpText(helpText: Omit<HelpText, 'id' | 'created_at' | 'updated_at'>) {
-  const { data, error } = await supabase
-    .from('help_texts')
-    .insert(helpText)
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.post('/billing.php?action=help-texts', helpText);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Erstellen des Hilfe-Texts') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function updateHelpText(id: string, updates: Partial<HelpText>) {
-  const { data, error } = await supabase
-    .from('help_texts')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.put(`/billing.php?action=help-text&id=${encodeURIComponent(id)}`, updates);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Aktualisieren des Hilfe-Texts') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function deleteHelpText(id: string) {
-  const { data, error } = await supabase
-    .from('help_texts')
-    .delete()
-    .eq('id', id);
-  return { data, error };
+  try {
+    const response = await apiClient.delete(`/billing.php?action=help-text&id=${encodeURIComponent(id)}`);
+    return { data: response.data, error: null };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function recordUsage(
@@ -488,111 +541,112 @@ export async function recordUsage(
   quantity: number = 1,
   referenceId: string | null = null
 ) {
-  const { data: itemType } = await supabase
-    .from('billing_item_types')
-    .select('id')
-    .eq('code', itemTypeCode)
-    .single();
-
-  if (!itemType) {
-    return { data: null, error: new Error(`Billing item type ${itemTypeCode} not found`) };
-  }
-
-  const { data: subscription } = await getUserSubscription(userId);
-
-  const now = new Date();
-  const periodStart = new Date(now.getFullYear(), now.getMonth(), 1);
-  const periodEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-
-  const { data, error } = await supabase
-    .from('usage_records')
-    .insert({
+  try {
+    const response = await apiClient.post('/billing.php?action=record-usage', {
       user_id: userId,
-      subscription_id: subscription?.id || null,
-      item_type_id: itemType.id,
+      item_type_code: itemTypeCode,
       quantity,
       reference_id: referenceId,
-      billing_period_start: periodStart.toISOString(),
-      billing_period_end: periodEnd.toISOString(),
-      is_billed: false,
-    })
-    .select()
-    .single();
-
-  return { data, error };
+    });
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Aufzeichnen der Nutzung') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 // User Account Config Functions
 export async function getUserAccountConfig(userId: string) {
-  const { data, error } = await supabase
-    .from('user_account_config')
-    .select('*')
-    .eq('user_id', userId)
-    .maybeSingle();
-  return { data, error };
+  try {
+    const response = await apiClient.get(`/billing.php?action=user-account-config&user_id=${encodeURIComponent(userId)}`);
+    return { data: response.data || null, error: null };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function upsertUserAccountConfig(config: Omit<UserAccountConfig, 'id' | 'created_at' | 'updated_at'>) {
-  const { data, error } = await supabase
-    .from('user_account_config')
-    .upsert(config, { onConflict: 'user_id' })
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.post(`/billing.php?action=user-account-config&user_id=${encodeURIComponent(config.user_id)}`, config);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Speichern der Account-Konfiguration') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 // Account Transactions Functions
 export async function getAccountTransactions(userId: string, limit = 50) {
-  const { data, error } = await supabase
-    .from('account_transactions')
-    .select('*')
-    .eq('user_id', userId)
-    .order('transaction_date', { ascending: false })
-    .limit(limit);
-  return { data, error };
+  try {
+    const response = await apiClient.get(`/billing.php?action=account-transactions&user_id=${encodeURIComponent(userId)}&limit=${limit}`);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden der Transaktionen') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function createAccountTransaction(transaction: Omit<AccountTransaction, 'id' | 'created_at'>) {
-  const { data, error } = await supabase
-    .from('account_transactions')
-    .insert(transaction)
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.post('/billing.php?action=account-transactions', transaction);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Erstellen der Transaktion') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 // Prepaid Recharge Amounts Functions
 export async function getPrepaidRechargeAmounts() {
-  const { data, error } = await supabase
-    .from('prepaid_recharge_amounts')
-    .select('*')
-    .eq('is_active', true)
-    .order('sort_order');
-  return { data, error };
+  try {
+    const response = await apiClient.get('/billing.php?action=prepaid-recharge-amounts&active_only=1');
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden der Prepaid-Aufladebeträge') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getAllPrepaidRechargeAmounts() {
-  const { data, error } = await supabase
-    .from('prepaid_recharge_amounts')
-    .select('*')
-    .order('sort_order');
-  return { data, error };
+  try {
+    const response = await apiClient.get('/billing.php?action=prepaid-recharge-amounts');
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden aller Prepaid-Aufladebeträge') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function upsertPrepaidRechargeAmount(amount: Omit<PrepaidRechargeAmount, 'id' | 'created_at' | 'updated_at'>) {
-  const { data, error } = await supabase
-    .from('prepaid_recharge_amounts')
-    .upsert(amount, { onConflict: 'amount,currency_code' })
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.post('/billing.php?action=prepaid-recharge-amounts', amount);
+    if (response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Speichern des Prepaid-Aufladebetrags') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function deletePrepaidRechargeAmount(id: string) {
-  const { data, error } = await supabase
-    .from('prepaid_recharge_amounts')
-    .delete()
-    .eq('id', id);
-  return { data, error };
+  try {
+    const response = await apiClient.delete(`/billing.php?action=prepaid-recharge-amount&id=${encodeURIComponent(id)}`);
+    return { data: response.data, error: null };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 

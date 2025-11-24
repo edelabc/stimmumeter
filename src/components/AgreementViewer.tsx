@@ -108,11 +108,25 @@ export function AgreementViewer({ slug }: AgreementViewerProps) {
     };
 
     try {
-      const html2pdf = (await import('html2pdf.js')).default;
-      await html2pdf().set(opt).from(element).save();
-    } catch (err) {
+      // Statischer Import für bessere Vite-Kompatibilität
+      const html2pdfModule = await import('html2pdf.js');
+      const html2pdf = html2pdfModule.default || html2pdfModule;
+      
+      if (typeof html2pdf === 'function') {
+        await html2pdf().set(opt).from(element).save();
+      } else if (html2pdf && typeof html2pdf.set === 'function') {
+        await html2pdf.set(opt).from(element).save();
+      } else {
+        throw new Error('html2pdf.js konnte nicht korrekt geladen werden');
+      }
+    } catch (err: any) {
       console.error('Error generating PDF:', err);
-      alert('Fehler beim Erstellen des PDFs');
+      const errorMessage = err.message || 'Unbekannter Fehler';
+      if (errorMessage.includes('Failed to fetch') || errorMessage.includes('dynamically imported')) {
+        alert('PDF-Bibliothek konnte nicht geladen werden. Bitte laden Sie die Seite neu.');
+      } else {
+        alert('Fehler beim Erstellen des PDFs: ' + errorMessage);
+      }
     }
   };
 

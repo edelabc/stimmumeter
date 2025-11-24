@@ -33,7 +33,8 @@ export function FooterMenuManagement() {
     position: 0,
     is_active: true,
     category: 'general',
-    linked_agreement_id: null as string | null
+    linked_agreement_id: null as string | null,
+    slug: null as string | null
   });
 
   useEffect(() => {
@@ -58,7 +59,8 @@ export function FooterMenuManagement() {
   const loadAgreements = async () => {
     try {
       const data = await getAllAgreements();
-      setAgreements(data.filter(a => a.status === 'Unterzeichnet'));
+      // Only show "Unterzeichnet" agreements that have slugs
+      setAgreements(data.filter(a => a.status === 'Unterzeichnet' && a.slug));
     } catch (error) {
       console.error('Error loading agreements:', error);
     }
@@ -78,7 +80,7 @@ export function FooterMenuManagement() {
 
     setEditingId(null);
     setIsAdding(false);
-    setFormData({ title: '', url: '', position: 0, is_active: true, category: 'general', linked_agreement_id: null });
+    setFormData({ title: '', url: '', position: 0, is_active: true, category: 'general', linked_agreement_id: null, slug: null });
     loadFooterItems();
   };
 
@@ -90,7 +92,8 @@ export function FooterMenuManagement() {
       position: item.position,
       is_active: item.is_active,
       category: item.category,
-      linked_agreement_id: item.linked_agreement_id || null
+      linked_agreement_id: item.linked_agreement_id || null,
+      slug: item.slug || null
     });
   };
 
@@ -104,7 +107,7 @@ export function FooterMenuManagement() {
   const handleCancel = () => {
     setEditingId(null);
     setIsAdding(false);
-    setFormData({ title: '', url: '', position: 0, is_active: true, category: 'general', linked_agreement_id: null });
+    setFormData({ title: '', url: '', position: 0, is_active: true, category: 'general', linked_agreement_id: null, slug: null });
   };
 
   if (loading) return <div className="text-center py-8">Lade Footer-Menü...</div>;
@@ -164,23 +167,41 @@ export function FooterMenuManagement() {
                 value={formData.linked_agreement_id || ''}
                 onChange={(e) => {
                   const agreementId = e.target.value || null;
-                  setFormData({
-                    ...formData,
-                    linked_agreement_id: agreementId,
-                    url: agreementId ? '/agreement/' : formData.url
-                  });
+                  if (agreementId) {
+                    const agreement = agreements.find((a) => a.id === agreementId);
+                    if (agreement && agreement.slug) {
+                      // Use the slug from the agreement (already generated when status was set to "Unterzeichnet")
+                      setFormData({
+                        ...formData,
+                        linked_agreement_id: agreementId,
+                        slug: agreement.slug,
+                        // Only set URL if no manual URL was entered
+                        url: formData.url && !formData.url.startsWith('/agreement/') && !formData.url.startsWith('/docs/') 
+                          ? formData.url 
+                          : `/agreement/${agreement.slug}`,
+                      });
+                    }
+                  } else {
+                    setFormData({
+                      ...formData,
+                      linked_agreement_id: null,
+                      slug: null,
+                      // Keep manual URL if it doesn't look like an auto-generated agreement URL
+                      url: formData.url.startsWith('/agreement/') || formData.url.startsWith('/docs/') ? '' : formData.url,
+                    });
+                  }
                 }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">-- Keine Vereinbarung --</option>
                 {agreements.map((agreement) => (
                   <option key={agreement.id} value={agreement.id}>
-                    {agreement.titel?.titel || 'Ohne Titel'} (Version {agreement.version})
+                    {agreement.titel?.titel || 'Ohne Titel'} (Version {agreement.version}) - {agreement.slug ? `/agreement/${agreement.slug}` : 'Kein Slug'}
                   </option>
                 ))}
               </select>
               <p className="text-xs text-gray-500 mt-1">
-                Wenn eine Vereinbarung verknüpft ist, wird die URL automatisch generiert
+                Wählen Sie eine bereits erstellte Vereinbarung mit Status "Unterzeichnet" aus. Der Link wird automatisch generiert.
               </p>
             </div>
             <div>
@@ -188,17 +209,56 @@ export function FooterMenuManagement() {
               <input
                 type="text"
                 value={formData.url}
-                onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                onChange={(e) => {
+                  // Manual URL has priority - if user enters something, use it
+                  const newUrl = e.target.value;
+                  setFormData({ 
+                    ...formData, 
+                    url: newUrl,
+                    // Clear linked_agreement_id if manual URL doesn't match agreement pattern
+                    linked_agreement_id: newUrl && !newUrl.startsWith('/agreement/') && !newUrl.startsWith('/docs/') 
+                      ? null 
+                      : formData.linked_agreement_id
+                  });
+                }}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="z.B. /legal/impressum"
-                disabled={!!formData.linked_agreement_id}
+                placeholder="z.B. /legal/impressum oder /agreement/..."
               />
-              {formData.linked_agreement_id && (
+              {formData.linked_agreement_id && formData.url.startsWith('/agreement/') && (
                 <p className="text-xs text-blue-600 mt-1">
-                  Die URL wird automatisch generiert basierend auf der Vereinbarung
+                  URL wird automatisch aus Vereinbarung generiert. Slug: <code className="bg-blue-50 px-1 rounded">{formData.slug}</code>
+                  <br />
+                  <span className="text-gray-500">Tipp: Sie können eine manuelle URL eingeben, die dann Priorität hat.</span>
+                </p>
+              )}
+              {formData.url && !formData.url.startsWith('/agreement/') && !formData.url.startsWith('/docs/') && (
+                <p className="text-xs text-green-600 mt-1">
+                  ✓ Manuelle URL wird verwendet (hat Priorität)
                 </p>
               )}
             </div>
+            {formData.linked_agreement_id && formData.url.includes('/agreement/') && (
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Slug (URL-Identifier)</label>
+                <input
+                  type="text"
+                  value={formData.url.replace('/agreement/', '')}
+                  onChange={(e) => {
+                    const newSlug = e.target.value;
+                    setFormData({
+                      ...formData,
+                      slug: newSlug,
+                      url: `/agreement/${newSlug}`,
+                    });
+                  }}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent font-mono text-sm"
+                  placeholder="impressum"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  URL-freundlicher Identifier. Wird automatisch aus dem Titel generiert.
+                </p>
+              </div>
+            )}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Position</label>
               <input

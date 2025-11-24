@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { Menu, X, Plus, Users, BarChart3, Settings as SettingsIcon, Calendar, LogOut, TrendingUp, Shield, User as UserIcon, Search } from 'lucide-react';
-import { supabase, Pseudonym, MoodIndicator, MoodEntryWithValues } from './lib/supabase';
+import type { Pseudonym, MoodIndicator, MoodEntryWithValues } from './lib/supabase';
 import { getCurrentUser, signOut } from './lib/auth';
 import { checkCurrentUserIsAdmin } from './lib/admin';
 import { AuthForm } from './components/AuthForm';
@@ -17,6 +17,63 @@ import { ForecastView } from './components/ForecastView';
 import { AccountSettings } from './components/AccountSettings';
 
 type View = 'entry' | 'history' | 'charts' | 'forecast';
+
+// Komponente für Indikator-Wert mit Tooltip
+function IndicatorValueWithTooltip({
+  indicatorName,
+  indicatorColor,
+  indicatorDescription,
+  value,
+}: {
+  indicatorName: string;
+  indicatorColor: string;
+  indicatorDescription?: string | null;
+  value: number;
+}) {
+  const [showTooltip, setShowTooltip] = useState(false);
+
+  return (
+    <div
+      className="flex items-center justify-between px-3 py-2 rounded-xl relative"
+      style={{ backgroundColor: `${indicatorColor}15` }}
+    >
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <span className="text-sm font-medium text-gray-700 truncate">
+          {indicatorName}
+        </span>
+        {indicatorDescription && (
+          <button
+            type="button"
+            onMouseEnter={() => setShowTooltip(true)}
+            onMouseLeave={() => setShowTooltip(false)}
+            className="text-gray-400 hover:text-blue-600 transition-colors flex-shrink-0"
+            aria-label="Hilfe anzeigen"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+        )}
+        {showTooltip && indicatorDescription && (
+          <div className="absolute left-0 bottom-full mb-2 w-80 bg-gray-900 text-white text-sm rounded-lg p-3 shadow-xl z-50 pointer-events-none">
+            <div className="font-semibold mb-1">{indicatorName}</div>
+            <div className="text-gray-300">{indicatorDescription}</div>
+            <div className="absolute top-full left-4 w-0 h-0 border-l-4 border-r-4 border-t-4 border-transparent border-t-gray-900"></div>
+          </div>
+        )}
+      </div>
+      <span
+        className="text-sm font-bold px-2 py-1 rounded-lg ml-2 flex-shrink-0"
+        style={{
+          backgroundColor: indicatorColor,
+          color: 'white'
+        }}
+      >
+        {value}
+      </span>
+    </div>
+  );
+}
 
 export function MoodApp() {
   const [user, setUser] = useState<any>(null);
@@ -79,85 +136,79 @@ export function MoodApp() {
   };
 
   const loadPseudonyms = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('pseudonyms')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: true });
-
-    if (error) {
-      console.error('Error loading pseudonyms:', error);
+    if (!user) {
+      console.warn('⚠️ [MoodApp] Kein Benutzer - Pseudonyme können nicht geladen werden');
       return;
     }
 
-    setPseudonyms(data || []);
+    // Verwende MySQL-API statt Supabase
+    try {
+      const { loadPseudonyms: loadPseudonymsAPI } = await import('./lib/mood-api-mysql');
+      const { data, error } = await loadPseudonymsAPI();
+      
+      if (error) {
+        console.error('❌ [MoodApp] Fehler beim Laden der Pseudonyme:', error);
+        alert('Fehler beim Laden der Pseudonyme: ' + (error.message || 'Unbekannter Fehler'));
+        return;
+      }
+
+      console.log('✅ [MoodApp] Pseudonyme erfolgreich geladen:', data?.length || 0);
+      setPseudonyms(data || []);
+    } catch (err) {
+      console.error('❌ [MoodApp] Exception beim Laden der Pseudonyme:', err);
+      alert('Fehler beim Laden der Pseudonyme: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'));
+    }
   };
 
   const loadIndicators = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('mood_indicators')
-      .select('*')
-      .or(`user_id.eq.${user.id},user_id.is.null`)
-      .order('sort_order', { ascending: true });
-
-    if (error) {
-      console.error('Error loading indicators:', error);
+    if (!user) {
+      console.warn('⚠️ [MoodApp] Kein Benutzer - Indikatoren können nicht geladen werden');
       return;
     }
 
-    setIndicators(data || []);
+    // Verwende MySQL-API statt Supabase
+    try {
+      const { loadIndicators: loadIndicatorsAPI } = await import('./lib/mood-api-mysql');
+      const { data, error } = await loadIndicatorsAPI();
+      
+      if (error) {
+        console.error('❌ [MoodApp] Fehler beim Laden der Indikatoren:', error);
+        alert('Fehler beim Laden der Indikatoren: ' + (error.message || 'Unbekannter Fehler'));
+        return;
+      }
+
+      console.log('✅ [MoodApp] Indikatoren erfolgreich geladen:', data?.length || 0);
+      setIndicators(data || []);
+    } catch (err) {
+      console.error('❌ [MoodApp] Exception beim Laden der Indikatoren:', err);
+      alert('Fehler beim Laden der Indikatoren: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'));
+    }
   };
 
   const loadMoodEntries = async (pseudonymId: string) => {
-    const { data: entriesData, error: entriesError } = await supabase
-      .from('mood_entries')
-      .select('*')
-      .eq('pseudonym_id', pseudonymId)
-      .order('entry_date', { ascending: false });
-
-    if (entriesError) {
-      console.error('Error loading mood entries:', entriesError);
+    if (!pseudonymId) {
+      console.warn('⚠️ [MoodApp] Keine Pseudonym-ID - Einträge können nicht geladen werden');
       return;
     }
 
-    const entriesWithValues: MoodEntryWithValues[] = [];
-
-    for (const entry of entriesData || []) {
-      const { data: valuesData, error: valuesError } = await supabase
-        .from('mood_indicator_values')
-        .select(`
-          id,
-          indicator_id,
-          value,
-          mood_indicators (name, color, color_start)
-        `)
-        .eq('mood_entry_id', entry.id);
-
-      if (valuesError) {
-        console.error('Error loading values:', valuesError);
-        continue;
+    // Verwende MySQL-API statt Supabase
+    try {
+      const { loadMoodEntries: loadMoodEntriesAPI } = await import('./lib/mood-api-mysql');
+      const { data, error } = await loadMoodEntriesAPI(pseudonymId);
+      
+      if (error) {
+        console.error('❌ [MoodApp] Fehler beim Laden der Einträge:', error);
+        alert('Fehler beim Laden der Einträge: ' + (error.message || 'Unbekannter Fehler'));
+        return;
       }
 
-      const values = (valuesData || [])
-        .filter((v: any) => v.mood_indicators !== null)
-        .map((v: any) => ({
-          indicator_id: v.indicator_id,
-          indicator_name: v.mood_indicators.name,
-          indicator_color: v.mood_indicators.color_start || v.mood_indicators.color,
-          value: v.value,
-        }));
-
-      entriesWithValues.push({
-        ...entry,
-        values,
-      });
+      console.log('✅ [MoodApp] Einträge erfolgreich geladen:', data?.length || 0);
+      // Daten sind bereits im richtigen Format (mit values)
+      setMoodEntries(data || []);
+    } catch (err) {
+      console.error('❌ [MoodApp] Exception beim Laden der Einträge:', err);
+      alert('Fehler beim Laden der Einträge: ' + (err instanceof Error ? err.message : 'Unbekannter Fehler'));
     }
-
-    setMoodEntries(entriesWithValues);
   };
 
   const handleCreateOrUpdatePseudonym = async (
@@ -167,56 +218,51 @@ export function MoodApp() {
   ) => {
     if (!user) return;
 
-    const dataToSave = {
-      name,
-      color,
-      ...personalData
-    };
+    try {
+      const { savePseudonym: savePseudonymAPI } = await import('./lib/mood-api-mysql');
+      
+      const dataToSave = {
+        ...(editingPseudonym ? { id: editingPseudonym.id } : {}),
+        name,
+        color,
+        ...personalData
+      };
 
-    if (editingPseudonym) {
-      const { error } = await supabase
-        .from('pseudonyms')
-        .update(dataToSave)
-        .eq('id', editingPseudonym.id);
-
-      if (error) {
-        console.error('Error updating pseudonym:', error);
-        return;
-      }
-    } else {
-      const { error } = await supabase
-        .from('pseudonyms')
-        .insert([{ ...dataToSave, user_id: user.id }]);
+      const { error } = await savePseudonymAPI(dataToSave);
 
       if (error) {
-        console.error('Error creating pseudonym:', error);
+        console.error('Error saving pseudonym:', error);
         return;
       }
+
+      await loadPseudonyms();
+      setIsFormOpen(false);
+      setEditingPseudonym(null);
+    } catch (err) {
+      console.error('Error saving pseudonym:', err);
     }
-
-    await loadPseudonyms();
-    setIsFormOpen(false);
-    setEditingPseudonym(null);
   };
 
   const handleDeletePseudonym = async (id: string) => {
     if (!confirm('Pseudonym löschen? Alle Daten gehen verloren.')) return;
 
-    const { error } = await supabase
-      .from('pseudonyms')
-      .delete()
-      .eq('id', id);
+    try {
+      const { deletePseudonym: deletePseudonymAPI } = await import('./lib/mood-api-mysql');
+      const { error } = await deletePseudonymAPI(id);
 
-    if (error) {
-      console.error('Error deleting pseudonym:', error);
-      return;
+      if (error) {
+        console.error('Error deleting pseudonym:', error);
+        return;
+      }
+
+      if (selectedPseudonym?.id === id) {
+        setSelectedPseudonym(null);
+      }
+
+      await loadPseudonyms();
+    } catch (err) {
+      console.error('Error deleting pseudonym:', err);
     }
-
-    if (selectedPseudonym?.id === id) {
-      setSelectedPseudonym(null);
-    }
-
-    await loadPseudonyms();
   };
 
   const handleEditPseudonym = (pseudonym: Pseudonym) => {
@@ -229,134 +275,85 @@ export function MoodApp() {
 
     setIsSubmitting(true);
 
-    if (editingEntry) {
-      const { error: deleteValuesError } = await supabase
-        .from('mood_indicator_values')
-        .delete()
-        .eq('mood_entry_id', editingEntry.id);
-
-      if (deleteValuesError) {
-        console.error('Error deleting old values:', deleteValuesError);
-        setIsSubmitting(false);
-        return;
-      }
-
+    try {
+      const { createMoodEntry, updateMoodEntry } = await import('./lib/mood-api-mysql');
+      
       const entryDateObj = new Date(entryDate);
       const computedTimeOfDay = timeOfDay || getTimeOfDayFromDate(entryDateObj);
 
-      const { error: updateError } = await supabase
-        .from('mood_entries')
-        .update({
-          note: note.trim() || null,
-          entry_date: entryDateObj.toISOString(),
-          time_of_day: computedTimeOfDay,
-          weather: weather.trim() || null,
-          weather_code: weatherCode,
-          latitude: latitude,
-          longitude: longitude,
-          temperature: temperature,
-          location: location.trim() || null,
-          custom_tags: customTags.length > 0 ? customTags : null,
-        })
-        .eq('id', editingEntry.id);
-
-      if (updateError) {
-        console.error('Error updating mood entry:', updateError);
-        setIsSubmitting(false);
-        return;
-      }
-
-      const valuesToInsert = Object.entries(selectedValues).map(([indicatorId, value]) => ({
-        mood_entry_id: editingEntry.id,
+      const valuesArray = Object.entries(selectedValues).map(([indicatorId, value]) => ({
         indicator_id: indicatorId,
-        value,
+        value: value as number,
       }));
 
-      const { error: valuesError } = await supabase
-        .from('mood_indicator_values')
-        .insert(valuesToInsert);
+      const entryData = {
+        pseudonym_id: selectedPseudonym.id,
+        note: note.trim() || null,
+        entry_date: entryDateObj.toISOString(),
+        time_of_day: computedTimeOfDay,
+        weather: weather.trim() || null,
+        weather_code: weatherCode,
+        latitude: latitude,
+        longitude: longitude,
+        temperature: temperature,
+        location: location.trim() || null,
+        custom_tags: customTags.length > 0 ? customTags : null,
+        values: valuesArray,
+      };
 
-      if (valuesError) {
-        console.error('Error creating indicator values:', valuesError);
-        setIsSubmitting(false);
-        return;
-      }
-    } else {
-      const entryDateObj = new Date(entryDate);
-      const computedTimeOfDay = timeOfDay || getTimeOfDayFromDate(entryDateObj);
-
-      const { data: entryData, error: entryError } = await supabase
-        .from('mood_entries')
-        .insert([{
-          pseudonym_id: selectedPseudonym.id,
-          note: note.trim() || null,
-          entry_date: entryDateObj.toISOString(),
-          time_of_day: computedTimeOfDay,
-          weather: weather.trim() || null,
-          weather_code: weatherCode,
-          latitude: latitude,
-          longitude: longitude,
-          temperature: temperature,
-          location: location.trim() || null,
-          custom_tags: customTags.length > 0 ? customTags : null,
-        }])
-        .select()
-        .single();
-
-      if (entryError || !entryData) {
-        console.error('Error creating mood entry:', entryError);
-        setIsSubmitting(false);
-        return;
+      if (editingEntry) {
+        const { error } = await updateMoodEntry(editingEntry.id, entryData);
+        if (error) {
+          console.error('Error updating mood entry:', error);
+          setIsSubmitting(false);
+          return;
+        }
+      } else {
+        const { data, error } = await createMoodEntry(entryData);
+        if (error || !data) {
+          console.error('Error creating mood entry:', error);
+          setIsSubmitting(false);
+          return;
+        }
       }
 
-      const valuesToInsert = Object.entries(selectedValues).map(([indicatorId, value]) => ({
-        mood_entry_id: entryData.id,
-        indicator_id: indicatorId,
-        value,
-      }));
-
-      const { error: valuesError } = await supabase
-        .from('mood_indicator_values')
-        .insert(valuesToInsert);
-
-      if (valuesError) {
-        console.error('Error creating indicator values:', valuesError);
-        setIsSubmitting(false);
-        return;
-      }
+      setSelectedValues({});
+      setNote('');
+      setEntryDate(new Date().toISOString().slice(0, 16));
+      setTimeOfDay('');
+      setWeather('');
+      setWeatherCode(null);
+      setLatitude(null);
+      setLongitude(null);
+      setTemperature(null);
+      setLocation('');
+      setCustomTags([]);
+      setEditingEntry(null);
+      setIndicatorSearchQuery('');
+      setIsSubmitting(false);
+      setIsEntryModalOpen(false);
+      await loadMoodEntries(selectedPseudonym.id);
+    } catch (err) {
+      console.error('Error submitting mood entry:', err);
+      setIsSubmitting(false);
     }
-
-    setSelectedValues({});
-    setNote('');
-    setEntryDate(new Date().toISOString().slice(0, 16));
-    setTimeOfDay('');
-    setWeather('');
-    setWeatherCode(null);
-    setLatitude(null);
-    setLongitude(null);
-    setTemperature(null);
-    setLocation('');
-    setCustomTags([]);
-    setEditingEntry(null);
-    setIndicatorSearchQuery('');
-    setIsSubmitting(false);
-    setIsEntryModalOpen(false);
-    await loadMoodEntries(selectedPseudonym.id);
   };
 
   const handleDeleteMoodEntry = async (id: string) => {
-    const { error } = await supabase
-      .from('mood_entries')
-      .delete()
-      .eq('id', id);
+    try {
+      const { deleteMoodEntry: deleteMoodEntryAPI } = await import('./lib/mood-api-mysql');
+      const { error } = await deleteMoodEntryAPI(id);
 
-    if (error) {
-      console.error('Error deleting mood entry:', error);
-      return;
-    }
+      if (error) {
+        console.error('Error deleting mood entry:', error);
+        return;
+      }
 
-    if (selectedPseudonym) {
-      await loadMoodEntries(selectedPseudonym.id);
+      if (selectedPseudonym) {
+        await loadMoodEntries(selectedPseudonym.id);
+      }
+    } catch (err) {
+      console.error('Error deleting mood entry:', err);
     }
   };
 
@@ -696,24 +693,13 @@ export function MoodApp() {
                                 </div>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                   {entry.values.map((val) => (
-                                    <div
+                                    <IndicatorValueWithTooltip
                                       key={val.indicator_id}
-                                      className="flex items-center justify-between px-3 py-2 rounded-xl"
-                                      style={{ backgroundColor: `${val.indicator_color}15` }}
-                                    >
-                                      <span className="text-sm font-medium text-gray-700">
-                                        {val.indicator_name}
-                                      </span>
-                                      <span
-                                        className="text-sm font-bold px-2 py-1 rounded-lg"
-                                        style={{
-                                          backgroundColor: val.indicator_color,
-                                          color: 'white'
-                                        }}
-                                      >
-                                        {val.value}
-                                      </span>
-                                    </div>
+                                      indicatorName={val.indicator_name}
+                                      indicatorColor={val.indicator_color}
+                                      indicatorDescription={val.indicator_description}
+                                      value={val.value}
+                                    />
                                   ))}
                                 </div>
                                 {entry.note && (
@@ -948,4 +934,3 @@ export function MoodApp() {
     </div>
   );
 }
-

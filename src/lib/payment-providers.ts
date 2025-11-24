@@ -1,4 +1,5 @@
-import { supabase } from './supabase';
+import { apiClient } from './api-client';
+import { ApiError } from './errors';
 
 export interface PaymentProvider {
   id: string;
@@ -28,114 +29,118 @@ export interface PaymentProviderWebhook {
 }
 
 export async function getAllPaymentProviders() {
-  const { data, error } = await supabase
-    .from('payment_providers')
-    .select('*')
-    .order('name');
-  return { data, error };
+  try {
+    const response = await apiClient.get('/payment-providers.php?action=list');
+    if (response.success && response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden der Payment Provider') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getPaymentProvider(code: string) {
-  const { data, error } = await supabase
-    .from('payment_providers')
-    .select('*')
-    .eq('code', code)
-    .maybeSingle();
-  return { data, error };
+  try {
+    const response = await apiClient.get(`/payment-providers.php?action=get&code=${encodeURIComponent(code)}`);
+    if (response.success && response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Payment Provider nicht gefunden') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function getActivePaymentProvider() {
-  const { data, error } = await supabase
-    .from('payment_providers')
-    .select('*')
-    .eq('is_active', true)
-    .maybeSingle();
-  return { data, error };
+  try {
+    const response = await apiClient.get('/payment-providers.php?action=active');
+    if (response.success) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden des aktiven Providers') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function upsertPaymentProvider(provider: Omit<PaymentProvider, 'id' | 'created_at' | 'updated_at'>) {
-  const { data, error } = await supabase
-    .from('payment_providers')
-    .upsert(provider, { onConflict: 'code' })
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const response = await apiClient.post('/payment-providers.php?action=upsert', provider);
+    if (response.success && response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Speichern des Payment Providers') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function updatePaymentProviderConfig(code: string, config: any) {
-  const { data, error } = await supabase
-    .from('payment_providers')
-    .update({ config })
-    .eq('code', code)
-    .select()
-    .single();
-  return { data, error };
+  try {
+    const provider = await getPaymentProvider(code);
+    if (provider.error || !provider.data) {
+      return { data: null, error: provider.error || new Error('Provider nicht gefunden') };
+    }
+    
+    return await upsertPaymentProvider({
+      ...provider.data,
+      config,
+    });
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function activatePaymentProvider(code: string, isActive: boolean) {
-  // Deactivate all other providers if activating this one
-  if (isActive) {
-    await supabase
-      .from('payment_providers')
-      .update({ is_active: false })
-      .neq('code', code);
+  try {
+    const response = await apiClient.post('/payment-providers.php?action=activate', {
+      code,
+      is_active: isActive,
+    });
+    if (response.success && response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Aktivieren des Payment Providers') };
+  } catch (error: any) {
+    return { data: null, error };
   }
-
-  const { data, error } = await supabase
-    .from('payment_providers')
-    .update({ is_active: isActive })
-    .eq('code', code)
-    .select()
-    .single();
-  return { data, error };
 }
 
 export async function getProviderWebhooks(providerId: string) {
-  const { data, error } = await supabase
-    .from('payment_provider_webhooks')
-    .select('*')
-    .eq('provider_id', providerId)
-    .order('created_at', { ascending: false });
-  return { data, error };
+  try {
+    const response = await apiClient.get(`/payment-providers.php?action=webhooks&provider_id=${encodeURIComponent(providerId)}`);
+    if (response.success && response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Laden der Webhooks') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 export async function upsertProviderWebhook(webhook: Partial<Omit<PaymentProviderWebhook, 'id' | 'created_at' | 'updated_at'>>) {
-  // Check if webhook exists for this provider
-  const { data: existing } = await supabase
-    .from('payment_provider_webhooks')
-    .select('id')
-    .eq('provider_id', webhook.provider_id!)
-    .maybeSingle();
-
-  if (existing) {
-    // Update existing webhook
-    const { data, error } = await supabase
-      .from('payment_provider_webhooks')
-      .update({
-        ...webhook,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', existing.id)
-      .select()
-      .single();
-    return { data, error };
-  } else {
-    // Insert new webhook
-    const { data, error } = await supabase
-      .from('payment_provider_webhooks')
-      .insert(webhook)
-      .select()
-      .single();
-    return { data, error };
+  try {
+    const response = await apiClient.post('/payment-providers.php?action=upsert-webhook', webhook);
+    if (response.success && response.data) {
+      return { data: response.data, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Speichern des Webhooks') };
+  } catch (error: any) {
+    return { data: null, error };
   }
 }
 
 export async function deleteProviderWebhook(id: string) {
-  const { data, error } = await supabase
-    .from('payment_provider_webhooks')
-    .delete()
-    .eq('id', id);
-  return { data, error };
+  try {
+    const response = await apiClient.delete(`/payment-providers.php?action=webhook&id=${encodeURIComponent(id)}`);
+    if (response.success) {
+      return { data: null, error: null };
+    }
+    return { data: null, error: new Error(response.error || 'Fehler beim Löschen des Webhooks') };
+  } catch (error: any) {
+    return { data: null, error };
+  }
 }
 
 // Stripe specific configuration

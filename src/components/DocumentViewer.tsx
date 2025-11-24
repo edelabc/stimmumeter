@@ -38,8 +38,9 @@ export function DocumentViewer({ slug }: DocumentViewerProps) {
 
     try {
       // Use html2pdf.js for client-side PDF generation
-      // Note: html2pdf.js needs to be installed: npm install html2pdf.js
-      const html2pdf = (await import('html2pdf.js')).default;
+      // Statischer Import für bessere Vite-Kompatibilität
+      const html2pdfModule = await import('html2pdf.js');
+      const html2pdf = html2pdfModule.default || html2pdfModule;
       
       const element = document.getElementById('agreement-content');
       if (!element) return;
@@ -52,7 +53,13 @@ export function DocumentViewer({ slug }: DocumentViewerProps) {
         jsPDF: { unit: 'mm' as const, format: 'a4' as const, orientation: 'portrait' as const },
       };
 
-      await html2pdf().set(opt).from(element).save();
+      if (typeof html2pdf === 'function') {
+        await html2pdf().set(opt).from(element).save();
+      } else if (html2pdf && typeof html2pdf.set === 'function') {
+        await html2pdf.set(opt).from(element).save();
+      } else {
+        throw new Error('html2pdf.js konnte nicht korrekt geladen werden');
+      }
     } catch (err: any) {
       console.error('PDF generation error:', err);
       alert('Fehler beim Generieren der PDF. Bitte stellen Sie sicher, dass html2pdf.js installiert ist.');

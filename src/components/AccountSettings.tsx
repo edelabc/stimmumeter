@@ -36,6 +36,10 @@ export function AccountSettings({ onClose }: AccountSettingsProps) {
     }
     
     setLoading(true);
+    if (!supabase) {
+      setLoading(false);
+      return;
+    }
     const { data: { user: authUser } } = await supabase.auth.getUser();
 
     if (authUser) {
@@ -154,6 +158,10 @@ function ProfileTab({ user, userProfile, onUpdate }: any) {
   });
 
   const handleSave = async () => {
+    if (!supabase) {
+      alert('Supabase ist nicht konfiguriert.');
+      return;
+    }
     const { error } = await supabase
       .from('user_profiles')
       .update({
@@ -601,6 +609,11 @@ function SecurityTab({ user }: any) {
 
     if (newPassword !== confirmPassword) {
       setPasswordError('Passwörter stimmen nicht überein');
+      return;
+    }
+
+    if (!supabase) {
+      setPasswordError('Supabase ist nicht konfiguriert.');
       return;
     }
 

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Plus, Edit2, Trash2, Save, X, FileText, History, Settings } from 'lucide-react';
+import { Plus, Edit2, Trash2, Save, X, FileText, History, Settings, ExternalLink, Copy } from 'lucide-react';
 import {
   getAllAgreements,
   getAllAgreementTitles,
@@ -15,6 +15,7 @@ import {
 } from '../../lib/agreement.service';
 import { PlatzhalterAuswahlModal } from './PlatzhalterAuswahlModal';
 import { DocumentTitleManagement } from './DocumentTitleManagement';
+import { supabase } from '../../lib/supabase';
 
 export function AgreementsManagement() {
   const [activeTab, setActiveTab] = useState<'agreements' | 'titles'>('agreements');
@@ -29,6 +30,7 @@ export function AgreementsManagement() {
   const [showLogs, setShowLogs] = useState(false);
   const [history, setHistory] = useState<Array<{ id: string; version: number; status: string; created_at: string }>>([]);
   const [logs, setLogs] = useState<any[]>([]);
+  const [agreementSlugs, setAgreementSlugs] = useState<Record<string, string>>({});
   const contentTextareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [formData, setFormData] = useState<CreateAgreementData & { status?: 'Entwurf' | 'Unterzeichnet' | 'Archiviert' }>({
@@ -65,12 +67,92 @@ export function AgreementsManagement() {
       ]);
       setAgreements(agreementsData);
       setTitles(titlesData);
+      
+      // Load slugs for agreements
+      await loadAgreementSlugs(agreementsData);
     } catch (error: any) {
       console.error('Error loading data:', error);
       alert('Fehler beim Laden der Daten: ' + error.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadAgreementSlugs = async (agreements: Vereinbarung[]) => {
+    try {
+      // Use slugs directly from agreements (new approach)
+      const slugMap: Record<string, string> = {};
+      
+      agreements.forEach(agreement => {
+        // Use slug directly from agreement if available
+        if (agreement.slug) {
+          slugMap[agreement.id] = agreement.slug;
+        }
+      });
+      
+      // Debug: Log which agreements don't have slugs (nur wenn wirklich fehlend)
+      const agreementsWithoutSlugs = agreements.filter(a => !a.slug && a.status === 'Unterzeichnet');
+      if (agreementsWithoutSlugs.length > 0) {
+        console.warn('⚠️ Vereinbarungen ohne Abruflink (Status: Unterzeichnet):', agreementsWithoutSlugs.map(a => ({
+          id: a.id,
+          titel: a.titel?.titel,
+          status: a.status
+        })));
+      }
+      
+      setAgreementSlugs(slugMap);
+    } catch (error) {
+      console.error('Error loading agreement slugs:', error);
+    }
+  };
+
+  const getAgreementUrl = (agreementId: string): string | null => {
+    const slug = agreementSlugs[agreementId];
+    return slug ? `/agreement/${slug}` : null;
+  };
+
+  /**
+   * Generiert die vollständige URL für eine Vereinbarung
+   * Funktioniert in allen Umgebungen (Development, Production, mit/ohne Base-Path)
+   */
+  const getFullAgreementUrl = (agreementId: string): string | null => {
+    const relativeUrl = getAgreementUrl(agreementId);
+    if (!relativeUrl) return null;
+    
+    // Verwende window.location.origin für die aktuelle Domain
+    // Das funktioniert automatisch in allen Umgebungen
+    const baseUrl = window.location.origin;
+    
+    // Erkenne Base-Path automatisch aus dem aktuellen Pfad
+    // z.B. wenn wir auf /stimmumeter/admin sind, ist der Base-Path /stimmumeter
+    const pathname = window.location.pathname;
+    let basePath = '';
+    
+    // Wenn der Pfad nicht im Root ist, extrahiere den Base-Path
+    if (pathname !== '/' && pathname !== '/index.html') {
+      // Entferne führende und abschließende Slashes und teile in Teile
+      const pathParts = pathname.split('/').filter(p => p && p !== 'index.html');
+      
+      // Wenn wir auf einer Route-Seite sind (admin, app, etc.), entferne diese
+      const routePages = ['admin', 'app', 'auth', 'landing-old', 'interactive-earth', 'questions-first'];
+      const filteredParts = pathParts.filter(p => !routePages.includes(p));
+      
+      // Wenn noch Teile übrig sind, ist der erste Teil der Base-Path
+      if (filteredParts.length > 0) {
+        basePath = '/' + filteredParts[0];
+      }
+    }
+    
+    // Kombiniere Base-URL, Base-Path und relativen Pfad
+    return `${baseUrl}${basePath}${relativeUrl}`;
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      alert('Link in Zwischenablage kopiert!');
+    }).catch(err => {
+      console.error('Fehler beim Kopieren:', err);
+    });
   };
 
   const handleSave = async () => {
@@ -90,16 +172,27 @@ export function AgreementsManagement() {
         anlagen: formData.anlagen || null,
       };
 
+      let updatedAgreement;
       if (editingId) {
-        await updateAgreement(editingId, cleanedData);
+        updatedAgreement = await updateAgreement(editingId, cleanedData);
       } else {
-        await createAgreement(cleanedData);
+        updatedAgreement = await createAgreement(cleanedData);
       }
 
       setEditingId(null);
       setIsAdding(false);
       resetForm();
-      loadData();
+      
+      // Lade Daten neu, um Slug zu aktualisieren
+      await loadData();
+      
+      // Wenn Status auf "Unterzeichnet" gesetzt wurde und Slug vorhanden ist, aktualisiere Slug-Map
+      if (updatedAgreement && updatedAgreement.status === 'Unterzeichnet' && updatedAgreement.slug) {
+        setAgreementSlugs(prev => ({
+          ...prev,
+          [updatedAgreement.id]: updatedAgreement.slug
+        }));
+      }
     } catch (error: any) {
       alert('Fehler beim Speichern: ' + error.message);
     }
@@ -516,16 +609,47 @@ export function AgreementsManagement() {
               <p className="text-sm text-gray-600 mb-2">
                 {agreement.kurze_zusammenfassung || 'Keine Zusammenfassung'}
               </p>
-              <div className="flex items-center gap-4 text-xs text-gray-500">
-                <span>
-                  Erstellt: {new Date(agreement.created_at).toLocaleDateString('de-DE')}
-                </span>
-                {agreement.gueltigkeit_von && (
+              <div className="flex flex-col gap-2 text-xs text-gray-500">
+                <div className="flex items-center gap-4">
                   <span>
-                    Gültig: {new Date(agreement.gueltigkeit_von).toLocaleDateString('de-DE')}
-                    {agreement.gueltigkeit_bis &&
-                      ` - ${new Date(agreement.gueltigkeit_bis).toLocaleDateString('de-DE')}`}
+                    Erstellt: {new Date(agreement.created_at).toLocaleDateString('de-DE')}
                   </span>
+                  {agreement.gueltigkeit_von && (
+                    <span>
+                      Gültig: {new Date(agreement.gueltigkeit_von).toLocaleDateString('de-DE')}
+                      {agreement.gueltigkeit_bis &&
+                        ` - ${new Date(agreement.gueltigkeit_bis).toLocaleDateString('de-DE')}`}
+                    </span>
+                  )}
+                </div>
+                {agreement.status === 'Unterzeichnet' && (
+                  getFullAgreementUrl(agreement.id) ? (
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-gray-600 font-medium">Abruflink:</span>
+                      <a
+                        href={getAgreementUrl(agreement.id)!}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:text-blue-700 hover:underline flex items-center gap-1"
+                      >
+                        {getFullAgreementUrl(agreement.id)}
+                        <ExternalLink size={12} />
+                      </a>
+                      <button
+                        onClick={() => copyToClipboard(getFullAgreementUrl(agreement.id)!)}
+                        className="p-1 text-gray-500 hover:text-gray-700 transition-colors"
+                        title="Link kopieren"
+                      >
+                        <Copy size={12} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-amber-600 text-xs italic">
+                        ⚠️ Slug wird beim Speichern automatisch generiert...
+                      </span>
+                    </div>
+                  )
                 )}
               </div>
             </div>

@@ -1,3 +1,4 @@
+# Logs
 logs
 *.log
 npm-debug.log*
@@ -11,6 +12,7 @@ dist
 dist-ssr
 *.local
 
+# Editor directories and files
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -20,4 +22,35 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables
 .env
+.env.local
+.env.development
+.env.production.local
+.env.development.local
+
+# Build outputs
+dist/
+build/
+
+# Supabase
+.supabase/
+
+# Database
+*.db
+*.sqlite
+
+# Backups
+backups/
+*.sql.gz
+*.sql.backup
+
+# PHP (nur für lokale Entwicklung)
+config.local.php
+
+# Dokumentation (optional)
+# DOKU/
+
+# Alte Versionen (optional)
+# startsite/

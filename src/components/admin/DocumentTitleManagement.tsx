@@ -16,6 +16,7 @@ interface DocumentTitleManagementProps {
 export function DocumentTitleManagement({ onTitleChange }: DocumentTitleManagementProps = {}) {
   const [titles, setTitles] = useState<Vereinbarungstitel[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isAdding, setIsAdding] = useState(false);
   const [formData, setFormData] = useState({
@@ -41,10 +42,29 @@ export function DocumentTitleManagement({ onTitleChange }: DocumentTitleManageme
   };
 
   const handleSave = async () => {
+    // Verhindere mehrfaches Klicken
+    if (saving) {
+      return;
+    }
+
     try {
       if (!formData.titel.trim()) {
         alert('Bitte geben Sie einen Titel ein.');
         return;
+      }
+
+      setSaving(true);
+
+      // Prüfe ob Titel bereits existiert (nur beim Erstellen)
+      if (!editingId) {
+        const existingTitle = titles.find(
+          t => t.titel.toLowerCase().trim() === formData.titel.toLowerCase().trim()
+        );
+        if (existingTitle) {
+          alert('Ein Dokumententitel mit diesem Namen existiert bereits.');
+          setSaving(false);
+          return;
+        }
       }
 
       if (editingId) {
@@ -60,6 +80,8 @@ export function DocumentTitleManagement({ onTitleChange }: DocumentTitleManageme
       if (onTitleChange) onTitleChange();
     } catch (error: any) {
       alert('Fehler beim Speichern: ' + error.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -178,10 +200,11 @@ export function DocumentTitleManagement({ onTitleChange }: DocumentTitleManageme
             <div className="flex gap-2 pt-4">
               <button
                 onClick={handleSave}
-                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors"
+                disabled={saving}
+                className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Save size={20} />
-                Speichern
+                {saving ? 'Speichere...' : 'Speichern'}
               </button>
               <button
                 onClick={() => {

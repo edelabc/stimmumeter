@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Shield, ShieldOff, Mail, Edit2, Trash2, Ban, Check } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { getApiBaseUrl } from '../../lib/api-client';
+
+// API Base URL dynamisch bestimmen
+const API_BASE_URL = (): string => getApiBaseUrl();
 
 interface User {
   id: string;
@@ -37,26 +40,34 @@ export function UserManagement() {
     setError('');
 
     try {
-      const { data: authUsers, error: authError } = await supabase
-        .from('user_profiles')
-        .select('*');
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Nicht authentifiziert');
+      }
 
-      if (authError) throw authError;
+      const response = await fetch(`${API_BASE_URL()}/users.php?action=list`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-      const { data: adminUsers } = await supabase
-        .from('admin_users')
-        .select('user_id');
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Fehler beim Laden der Benutzer' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
 
-      const adminUserIds = new Set(adminUsers?.map(a => a.user_id) || []);
+      const data = await response.json();
+      
+      if (!data.success) {
+        throw new Error(data.error || 'Fehler beim Laden der Benutzer');
+      }
 
-      const usersWithAdminStatus = (authUsers || []).map(user => ({
-        ...user,
-        is_admin: adminUserIds.has(user.id)
-      }));
-
-      setUsers(usersWithAdminStatus);
+      console.log('✅ [UserManagement] Benutzer geladen:', data.data?.length || 0);
+      setUsers(data.data || []);
     } catch (err: any) {
-      setError(err.message);
+      console.error('❌ [UserManagement] Fehler beim Laden der Benutzer:', err);
+      setError(err.message || 'Fehler beim Laden der Benutzer');
     } finally {
       setLoading(false);
     }
@@ -64,33 +75,63 @@ export function UserManagement() {
 
   const handleToggleAdmin = async (userId: string, isCurrentlyAdmin: boolean) => {
     try {
-      if (isCurrentlyAdmin) {
-        await supabase
-          .from('admin_users')
-          .delete()
-          .eq('user_id', userId);
-      } else {
-        await supabase
-          .from('admin_users')
-          .insert({ user_id: userId });
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Nicht authentifiziert');
       }
-      loadUsers();
+
+      const url = `${API_BASE_URL()}/admin-users.php${isCurrentlyAdmin ? `?user_id=${userId}` : ''}`;
+      const method = isCurrentlyAdmin ? 'DELETE' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: method === 'POST' ? JSON.stringify({ user_id: userId }) : undefined,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Fehler beim Ändern der Admin-Rechte' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      await loadUsers();
     } catch (err: any) {
-      setError(err.message);
+      console.error('❌ [UserManagement] Fehler beim Ändern der Admin-Rechte:', err);
+      setError(err.message || 'Fehler beim Ändern der Admin-Rechte');
     }
   };
 
   const handleToggleBlock = async (userId: string, isCurrentlyBlocked: boolean) => {
     try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({ is_blocked: !isCurrentlyBlocked })
-        .eq('id', userId);
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Nicht authentifiziert');
+      }
 
-      if (error) throw error;
-      loadUsers();
+      const response = await fetch(`${API_BASE_URL()}/users.php?id=${userId}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: userId,
+          is_blocked: !isCurrentlyBlocked ? 1 : 0,
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Fehler beim Ändern des Sperrstatus' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      await loadUsers();
     } catch (err: any) {
-      setError(err.message);
+      console.error('❌ [UserManagement] Fehler beim Ändern des Sperrstatus:', err);
+      setError(err.message || 'Fehler beim Ändern des Sperrstatus');
     }
   };
 
@@ -103,9 +144,19 @@ export function UserManagement() {
     if (!editingUser) return;
 
     try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Nicht authentifiziert');
+      }
+
+      const response = await fetch(`${API_BASE_URL()}/users.php?id=${editingUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          id: editingUser.id,
           salutation: editingUser.salutation,
           preferred_language: editingUser.preferred_language,
           location_label: editingUser.location_label,
@@ -116,17 +167,21 @@ export function UserManagement() {
           city: editingUser.city,
           city_addition: editingUser.city_addition,
           state: editingUser.state,
-          country: editingUser.country
-        })
-        .eq('id', editingUser.id);
+          country: editingUser.country,
+        }),
+      });
 
-      if (error) throw error;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Fehler beim Speichern' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
 
       setShowEditModal(false);
       setEditingUser(null);
-      loadUsers();
+      await loadUsers();
     } catch (err: any) {
-      setError(err.message);
+      console.error('❌ [UserManagement] Fehler beim Speichern:', err);
+      setError(err.message || 'Fehler beim Speichern');
     }
   };
 
@@ -136,22 +191,27 @@ export function UserManagement() {
     }
 
     try {
-      // First remove from admin_users if exists
-      await supabase
-        .from('admin_users')
-        .delete()
-        .eq('user_id', userId);
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Nicht authentifiziert');
+      }
 
-      // Then delete user profile
-      const { error } = await supabase
-        .from('user_profiles')
-        .delete()
-        .eq('id', userId);
+      const response = await fetch(`${API_BASE_URL()}/users.php?id=${userId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
 
-      if (error) throw error;
-      loadUsers();
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Fehler beim Löschen' }));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
+      }
+
+      await loadUsers();
     } catch (err: any) {
-      setError(err.message);
+      console.error('❌ [UserManagement] Fehler beim Löschen:', err);
+      setError(err.message || 'Fehler beim Löschen');
     }
   };
 
@@ -206,15 +266,15 @@ export function UserManagement() {
                   <Edit2 size={20} />
                 </button>
                 <button
-                  onClick={() => handleToggleBlock(user.id, user.is_blocked || false)}
+                  onClick={() => handleToggleBlock(user.id, !!(user.is_blocked && user.is_blocked !== 0))}
                   className={`p-2 rounded-lg transition-colors ${
-                    user.is_blocked
+                    user.is_blocked && user.is_blocked !== 0
                       ? 'bg-green-100 text-green-600 hover:bg-green-200'
                       : 'bg-yellow-100 text-yellow-600 hover:bg-yellow-200'
                   }`}
-                  title={user.is_blocked ? 'Entsperren' : 'Sperren'}
+                  title={user.is_blocked && user.is_blocked !== 0 ? 'Entsperren' : 'Sperren'}
                 >
-                  {user.is_blocked ? <Check size={20} /> : <Ban size={20} />}
+                  {user.is_blocked && user.is_blocked !== 0 ? <Check size={20} /> : <Ban size={20} />}
                 </button>
                 <button
                   onClick={() => handleToggleAdmin(user.id, user.is_admin || false)}

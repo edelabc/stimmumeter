@@ -1,7 +1,33 @@
 import { useState, useEffect, useRef } from 'react';
 import { Settings, Plus, Trash2, CreditCard as Edit2, Save, X, Upload, Brain } from 'lucide-react';
-import { supabase, MoodIndicator } from '../lib/supabase';
 import { AIConfiguration } from './AIConfiguration';
+import { getApiBaseUrl } from '../lib/api-client';
+
+// Hilfsfunktion: Prüft ob icon_url eine URL oder ein Emoji ist
+function isUrl(iconUrl: string): boolean {
+  return iconUrl.startsWith('http://') || iconUrl.startsWith('https://') || iconUrl.startsWith('/');
+}
+
+// Type definition
+export interface MoodIndicator {
+  id: string;
+  name: string;
+  min_value: number;
+  max_value: number;
+  step_value: number;
+  color_start: string;
+  color_end: string;
+  icon_url: string | null;
+  category_id: string | null;
+  sort_order: number;
+  is_active: boolean;
+  user_id: string | null;
+  category?: {
+    id: string;
+    name: string;
+    description: string | null;
+  } | null;
+}
 
 interface MasterDataSettingsProps {
   isOpen: boolean;
@@ -39,29 +65,33 @@ export function MasterDataSettings({
   }, [isOpen]);
 
   const loadIndicators = async () => {
-    const { data, error } = await supabase
-      .from('mood_indicators')
-      .select(`
-        *,
-        category:indicator_categories(*)
-      `)
-      .or(`user_id.eq.${userId},user_id.is.null`)
-      .order('sort_order', { ascending: true });
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${getApiBaseUrl()}/mood-indicators.php?action=list`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (error) {
-      console.error('Error loading indicators:', error);
-      return;
+      if (!response.ok) {
+        throw new Error('Fehler beim Laden der Indikatoren');
+      }
+
+      const result = await response.json();
+      if (result.success && result.data) {
+        setIndicators(result.data);
+      }
+    } catch (err) {
+      console.error('Error loading indicators:', err);
     }
-
-    setIndicators(data || []);
   };
 
   const handleIconUpload = async (file: File) => {
     setUploadingIcon(true);
     try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userId}/${Date.now()}.${fileExt}`;
-
+      // Für jetzt: Konvertiere zu Data URL (später kann man einen Upload-Endpunkt hinzufügen)
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       const img = new Image();
@@ -77,25 +107,11 @@ export function MasterDataSettings({
       canvas.height = size;
       ctx?.drawImage(img, 0, 0, size, size);
 
-      const blob = await new Promise<Blob>((resolve) => {
-        canvas.toBlob((b) => resolve(b!), 'image/png');
-      });
-
-      const { data, error } = await supabase.storage
-        .from('indicator-icons')
-        .upload(fileName, blob, {
-          contentType: 'image/png',
-          upsert: false,
-        });
-
-      if (error) throw error;
-
-      const { data: urlData } = supabase.storage
-        .from('indicator-icons')
-        .getPublicUrl(data.path);
-
-      setFormData({ ...formData, icon_url: urlData.publicUrl });
-      setIconPreview(urlData.publicUrl);
+      const dataUrl = canvas.toDataURL('image/png');
+      
+      // Verwende Data URL direkt (später kann man einen Upload-Endpunkt hinzufügen)
+      setFormData({ ...formData, icon_url: dataUrl });
+      setIconPreview(dataUrl);
     } catch (error) {
       console.error('Error uploading icon:', error);
       alert('Fehler beim Hochladen des Icons');
@@ -107,97 +123,91 @@ export function MasterDataSettings({
   const handleCreate = async () => {
     if (!formData.name.trim()) return;
 
-    const trimmedName = formData.name.trim();
-    
-    // Prüfe, ob der Benutzer bereits einen Indikator mit diesem Namen hat
-    const existingIndicator = indicators.find(
-      (ind) => ind.user_id === userId && ind.name.toLowerCase().trim() === trimmedName.toLowerCase()
-    );
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${getApiBaseUrl()}/mood-indicators.php`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          name: formData.name.trim(),
+          color: formData.color_start,
+          is_active: true,
+        }),
+      });
 
-    if (existingIndicator) {
-      alert('Du hast bereits einen Indikator mit diesem Namen. Bitte wähle einen anderen Namen.');
-      return;
-    }
-
-    const maxSortOrder = Math.max(...indicators.map(i => i.sort_order), 0);
-
-    const { error } = await supabase
-      .from('mood_indicators')
-      .insert([{
-        ...formData,
-        name: trimmedName,
-        user_id: userId,
-        sort_order: maxSortOrder + 1,
-        color: formData.color_start,
-      }]);
-
-    if (error) {
-      console.error('Error creating indicator:', error);
-      if (error.code === '23505') {
-        alert('Du hast bereits einen Indikator mit diesem Namen. Bitte wähle einen anderen Namen.');
-      } else {
-        alert('Fehler: ' + error.message);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Fehler beim Erstellen' }));
+        throw new Error(errorData.error || 'Fehler beim Erstellen');
       }
-      return;
-    }
 
-    resetForm();
-    await loadIndicators();
-    onIndicatorsUpdated();
+      resetForm();
+      await loadIndicators();
+      onIndicatorsUpdated();
+    } catch (err: any) {
+      console.error('Error creating indicator:', err);
+      alert(err.message || 'Fehler beim Erstellen des Indikators');
+    }
   };
 
   const handleUpdate = async (id: string) => {
-    const trimmedName = formData.name.trim();
-    
-    // Prüfe, ob der Benutzer bereits einen anderen Indikator mit diesem Namen hat
-    const existingIndicator = indicators.find(
-      (ind) => ind.id !== id && ind.user_id === userId && ind.name.toLowerCase().trim() === trimmedName.toLowerCase()
-    );
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${getApiBaseUrl()}/mood-indicators.php?id=${id}`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          name: formData.name.trim(),
+          id,
+        }),
+      });
 
-    if (existingIndicator) {
-      alert('Du hast bereits einen Indikator mit diesem Namen. Bitte wähle einen anderen Namen.');
-      return;
-    }
-
-    const { error } = await supabase
-      .from('mood_indicators')
-      .update({
-        ...formData,
-        name: trimmedName,
-      })
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error updating indicator:', error);
-      if (error.code === '23505') {
-        alert('Du hast bereits einen Indikator mit diesem Namen. Bitte wähle einen anderen Namen.');
-      } else {
-        alert('Fehler: ' + error.message);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Fehler beim Aktualisieren' }));
+        throw new Error(errorData.error || 'Fehler beim Aktualisieren');
       }
-      return;
-    }
 
-    setEditingId(null);
-    resetForm();
-    await loadIndicators();
-    onIndicatorsUpdated();
+      setEditingId(null);
+      resetForm();
+      await loadIndicators();
+      onIndicatorsUpdated();
+    } catch (err: any) {
+      console.error('Error updating indicator:', err);
+      alert(err.message || 'Fehler beim Aktualisieren des Indikators');
+    }
   };
 
   const handleDelete = async (id: string) => {
     if (!confirm('Indikator löschen? Alle Daten gehen verloren.')) return;
 
-    const { error } = await supabase
-      .from('mood_indicators')
-      .delete()
-      .eq('id', id);
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${getApiBaseUrl()}/mood-indicators.php?id=${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
 
-    if (error) {
-      console.error('Error deleting indicator:', error);
-      return;
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Fehler beim Löschen' }));
+        throw new Error(errorData.error || 'Fehler beim Löschen');
+      }
+
+      await loadIndicators();
+      onIndicatorsUpdated();
+    } catch (err: any) {
+      console.error('Error deleting indicator:', err);
+      alert(err.message || 'Fehler beim Löschen des Indikators');
     }
-
-    await loadIndicators();
-    onIndicatorsUpdated();
   };
 
   const startEdit = (indicator: MoodIndicator) => {
@@ -452,9 +462,15 @@ export function MasterDataSettings({
                   }`}
                 >
                   {indicator.icon_url ? (
-                    <div className="w-12 h-12 flex items-center justify-center bg-white rounded-lg border-2 border-gray-200">
-                      <img src={indicator.icon_url} alt={indicator.name} className="w-10 h-10 object-contain" />
-                    </div>
+                    isUrl(indicator.icon_url) ? (
+                      <div className="w-12 h-12 flex items-center justify-center bg-white rounded-lg border-2 border-gray-200">
+                        <img src={indicator.icon_url} alt={indicator.name} className="w-10 h-10 object-contain" />
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 flex items-center justify-center bg-white rounded-lg border-2 border-gray-200 text-2xl">
+                        {indicator.icon_url}
+                      </div>
+                    )
                   ) : (
                     <div
                       className="w-8 h-8 rounded-lg"
