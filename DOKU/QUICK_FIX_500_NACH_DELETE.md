@@ -175,3 +175,5 @@ chmod 644 api/*.php
 - Ohne sie gibt es 500 Errors für alle Routes
 - Sie muss im Root-Verzeichnis liegen (gleiche Ebene wie `index.html`)
 
+
+

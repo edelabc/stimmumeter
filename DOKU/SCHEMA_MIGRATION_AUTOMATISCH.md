@@ -350,3 +350,5 @@ $sqlFile = __DIR__ . '/../database/create-complete-database.sql';
 Die Datenbank-Struktur wird automatisch angepasst - Sie müssen sich keine Sorgen machen! 🎉
 
 
+
+

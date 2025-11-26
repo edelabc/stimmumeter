@@ -221,3 +221,5 @@ Die Funktion verwendet zur Laufzeit `window.location`, daher sollte sie automati
 
 **✅ Fertig!** Nach diesen Schritten sollten die gebauten Dateien keine `localhost`-URLs mehr enthalten.
 
+
+

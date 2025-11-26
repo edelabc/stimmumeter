@@ -89,3 +89,5 @@ pkill -f "vite"
 
 **Status:** ✅ Anwendung läuft
 
+
+

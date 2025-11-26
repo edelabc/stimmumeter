@@ -133,3 +133,5 @@ VITE_API_BASE_URL=http://localhost/stimmumeter/api
 
 **Nächste Aktion:** Erstelle `api/pseudonyms.php` für Pseudonym-Verwaltung
 
+
+

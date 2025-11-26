@@ -112,3 +112,5 @@ foreach ($tables as $table) {
 echo "\n✅ Prüfung abgeschlossen!\n";
 
 
+
+

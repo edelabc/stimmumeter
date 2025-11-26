@@ -159,3 +159,5 @@ VITE_API_BASE_URL=http://localhost/stimmumeter/api
 
 **Status:** 🚧 Basis-Umstellung abgeschlossen, weitere APIs und Komponenten folgen
 
+
+

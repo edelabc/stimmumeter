@@ -1,15 +1,10 @@
 import { useState, useEffect } from 'react';
 import { Save, Plus, Trash2 } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { getFooterSettings, updateFooterSettings, FooterContent } from '../../lib/menu.service';
 
 interface FooterLink {
   title: string;
   url: string;
-}
-
-interface FooterContent {
-  text: string;
-  links: FooterLink[];
 }
 
 export function FooterManagement() {
@@ -26,39 +21,28 @@ export function FooterManagement() {
   }, []);
 
   const loadFooterSettings = async () => {
-    const { data } = await supabase
-      .from('footer_settings')
-      .select('*')
-      .maybeSingle();
-
-    if (data) {
-      setFooterId(data.id);
-      if (data.content) {
-        setContent(data.content as FooterContent);
+    try {
+      const settings = await getFooterSettings();
+      setFooterId(settings.id);
+      if (settings.content) {
+        setContent(settings.content);
       }
+    } catch (error) {
+      console.error('Fehler beim Laden der Footer-Einstellungen:', error);
+      // Behalte Standard-Content bei Fehler
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleSave = async () => {
-    const payload = { content };
-
-    if (footerId) {
-      await supabase
-        .from('footer_settings')
-        .update(payload)
-        .eq('id', footerId);
-    } else {
-      const { data } = await supabase
-        .from('footer_settings')
-        .insert(payload)
-        .select()
-        .single();
-
-      if (data) setFooterId(data.id);
+    try {
+      await updateFooterSettings(content);
+      alert('Footer erfolgreich gespeichert!');
+    } catch (error) {
+      console.error('Fehler beim Speichern:', error);
+      alert('Fehler beim Speichern der Footer-Einstellungen');
     }
-
-    alert('Footer erfolgreich gespeichert!');
   };
 
   const handleAddLink = () => {

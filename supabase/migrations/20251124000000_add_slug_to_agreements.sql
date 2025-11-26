@@ -115,3 +115,5 @@ END $$;
 COMMENT ON COLUMN t_vereinbarungen.slug IS 'URL-friendly identifier for agreement. Auto-generated when status is set to "Unterzeichnet".';
 
 
+
+

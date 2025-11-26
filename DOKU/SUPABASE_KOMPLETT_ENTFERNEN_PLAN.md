@@ -570,3 +570,5 @@ grep -r "import.*supabase" src/
 
 **Ende des Plans**
 
+
+

@@ -230,3 +230,5 @@ required={agreement.consentType === 'AGB'}  // Nur AGB ist Pflichtfeld
 Die Registrierung ist jetzt GDPR-konform mit Checkboxen für AGB, Datenschutz und Cookies! 🎉
 
 
+
+

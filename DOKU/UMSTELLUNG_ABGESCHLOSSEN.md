@@ -183,3 +183,5 @@ Die Basis-Funktionalität (Authentifizierung, Mood-Tracking, Vereinbarungen) ist
 
 **Status:** ✅ Basis-Umstellung erfolgreich abgeschlossen
 
+
+

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X, FileText } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
 import { getAllAgreements, Vereinbarung } from '../../lib/agreement.service';
+import { getAllMenuItems, createMenuItem, updateMenuItem, deleteMenuItem, MenuItem } from '../../lib/menu.service';
 
 interface MenuItem {
   id: string;
@@ -40,13 +40,15 @@ export function MenuManagement() {
   // Note: URL auto-generation is handled in handleAgreementChange
 
   const loadMenuItems = async () => {
-    const { data } = await supabase
-      .from('menu_items')
-      .select('*')
-      .order('position');
-
-    if (data) setItems(data);
-    setLoading(false);
+    try {
+      const data = await getAllMenuItems();
+      setItems(data);
+    } catch (error) {
+      console.error('Fehler beim Laden der Menu-Items:', error);
+      setItems([]); // Leeres Array statt null
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadAgreements = async () => {
@@ -60,21 +62,21 @@ export function MenuManagement() {
   };
 
   const handleSave = async () => {
-    if (editingId) {
-      await supabase
-        .from('menu_items')
-        .update(formData)
-        .eq('id', editingId);
-    } else {
-      await supabase
-        .from('menu_items')
-        .insert(formData);
-    }
+    try {
+      if (editingId) {
+        await updateMenuItem(editingId, formData);
+      } else {
+        await createMenuItem(formData);
+      }
 
-    setEditingId(null);
-    setIsAdding(false);
-    resetForm();
-    loadMenuItems();
+      setEditingId(null);
+      setIsAdding(false);
+      resetForm();
+      loadMenuItems();
+    } catch (error) {
+      console.error('Fehler beim Speichern:', error);
+      alert('Fehler beim Speichern des Menu-Items');
+    }
   };
 
   const handleEdit = (item: MenuItem) => {
@@ -93,8 +95,13 @@ export function MenuManagement() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Menüpunkt wirklich löschen?')) {
-      await supabase.from('menu_items').delete().eq('id', id);
-      loadMenuItems();
+      try {
+        await deleteMenuItem(id);
+        loadMenuItems();
+      } catch (error) {
+        console.error('Fehler beim Löschen:', error);
+        alert('Fehler beim Löschen des Menu-Items');
+      }
     }
   };
 

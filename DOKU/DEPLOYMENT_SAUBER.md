@@ -115,3 +115,5 @@ Falls Sie Apache verwenden, können Sie eine `.htaccess` Regel hinzufügen, die 
 
 Für die meisten Fälle reicht es aber, vor jedem Deployment die alten Dateien manuell zu löschen.
 
+
+

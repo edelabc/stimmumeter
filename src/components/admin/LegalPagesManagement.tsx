@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Edit2, Save, X } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { getAllLegalPages, updateLegalPage, LegalPage } from '../../lib/menu.service';
 
 interface LegalPage {
   id: string;
@@ -21,26 +21,29 @@ export function LegalPagesManagement() {
   }, []);
 
   const loadPages = async () => {
-    const { data } = await supabase
-      .from('legal_pages')
-      .select('*')
-      .order('page_type');
-
-    if (data) setPages(data);
-    setLoading(false);
+    try {
+      const data = await getAllLegalPages();
+      setPages(data);
+    } catch (error) {
+      console.error('Fehler beim Laden der Legal Pages:', error);
+      setPages([]); // Leeres Array statt null
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSave = async () => {
     if (editingId) {
-      await supabase
-        .from('legal_pages')
-        .update(formData)
-        .eq('id', editingId);
+      try {
+        await updateLegalPage(editingId, formData);
+        setEditingId(null);
+        setFormData({ title: '', content: '', is_active: true });
+        loadPages();
+      } catch (error) {
+        console.error('Fehler beim Speichern:', error);
+        alert('Fehler beim Speichern der Legal Page');
+      }
     }
-
-    setEditingId(null);
-    setFormData({ title: '', content: '', is_active: true });
-    loadPages();
   };
 
   const handleEdit = (page: LegalPage) => {

@@ -3,6 +3,7 @@ import { X, Plus, Trash2, Check, Eye, EyeOff, AlertCircle, Edit2, Code, Zap } fr
 import { AITermsModal } from './AITermsModal';
 import { AIService } from '../lib/ai-service';
 import { getApiBaseUrl } from '../lib/api-client';
+import { decryptValue } from '../lib/encryption';
 
 // Type definition
 export interface AIConfiguration {
@@ -336,7 +337,13 @@ export function AIConfiguration({ isOpen, onClose, userId }: AIConfigurationProp
     setTestResult(null);
 
     try {
-      const result = await AIService.testConnection(config);
+      // Entschlüssle den API-Key vor dem Test
+      const decryptedConfig = {
+        ...config,
+        api_key: decryptValue(config.api_key)
+      };
+      
+      const result = await AIService.testConnection(decryptedConfig);
       setTestResult({
         configId: config.id,
         success: result.success,

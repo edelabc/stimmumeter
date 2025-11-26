@@ -119,3 +119,5 @@ Nach der Migration sollten:
 **Die einfachste Methode ist das Supabase Dashboard!** 🎉
 
 
+
+

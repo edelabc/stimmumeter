@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Calendar, TrendingUp, TrendingDown, Minus, Brain, Sparkles, AlertCircle } from 'lucide-react';
-import { MoodEntryWithValues, MoodIndicator, Pseudonym, AIConfiguration, supabase } from '../lib/supabase';
+import { MoodEntryWithValues, MoodIndicator, Pseudonym } from '../lib/supabase';
+import { getAIConfigurationsByUser, AIConfiguration } from '../lib/ai-provider.service';
 import { AIService, AIAnalysisResponse } from '../lib/ai-service';
 import { GroupingFilter, GroupingFilterState } from './GroupingFilter';
 import { filterEntriesByGrouping, extractUniqueValues, getFilterLabel } from '../lib/grouping-utils';
@@ -31,22 +32,16 @@ export function ForecastView({ entries, indicators, selectedPseudonym, userId }:
 
   const loadAiConfigurations = async () => {
     try {
-      const { data, error } = await supabase
-        .from('ai_configurations')
-        .select('*')
-        .eq('user_id', userId)
-        .eq('is_enabled', true)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      setAiConfigurations(data || []);
-      const activeConfig = data?.find(c => c.is_active);
+      const data = await getAIConfigurationsByUser(userId, true);
+      setAiConfigurations(data);
+      
+      const activeConfig = data.find(c => c.is_active);
       if (activeConfig) {
         setSelectedAiConfig(activeConfig);
       }
     } catch (err) {
       console.error('Error loading AI configurations:', err);
+      setAiConfigurations([]); // Leeres Array bei Fehler
     }
   };
 

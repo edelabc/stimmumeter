@@ -88,3 +88,5 @@ CREATE POLICY "Admins can view all consents"
 COMMENT ON TABLE user_agreement_consents IS 'Stores user consent for legal agreements (AGB, Datenschutz, Cookies, etc.) during registration';
 
 
+
+

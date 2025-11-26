@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '../../lib/supabase';
 import { FileText, AlertCircle, Info, AlertTriangle, XCircle, RefreshCw, Search, Filter } from 'lucide-react';
 
 interface AuditLog {
@@ -29,17 +28,13 @@ export function AuditLogViewer() {
   const loadLogs = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('recent_audit_logs')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      setLogs(data || []);
+      // TODO: Implement audit logs API
+      // Temporarily return empty array until API is implemented
+      console.warn('Audit logs API not yet implemented - showing empty state');
+      setLogs([]);
     } catch (error: any) {
       console.error('Error loading audit logs:', error);
-      alert(`Fehler beim Laden der Logs: ${error.message}`);
+      setLogs([]);
     }
     setLoading(false);
   };

@@ -334,3 +334,5 @@ Diese müssen in separate Dateien verschoben werden.
 - ✅ Supabase parallel betreiben bis Migration abgeschlossen
 - ✅ Dann Supabase komplett entfernen
 
+
+

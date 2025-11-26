@@ -98,3 +98,5 @@ curl 'http://localhost/stimmumeter/api/auth.php?action=user'
 
 **Status:** ✅ Problem gelöst
 
+
+

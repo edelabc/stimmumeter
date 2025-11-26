@@ -131,3 +131,5 @@ Das XAMPP Control Panel zeigt möglicherweise keine Erfolgsmeldung, aber MySQL l
 
 **Status:** ✅ MySQL läuft und funktioniert
 
+
+

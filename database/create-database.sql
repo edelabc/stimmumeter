@@ -15,3 +15,5 @@ USE `wameli`;
 SELECT 'Datenbank wameli erfolgreich erstellt!' AS Status;
 
 
+
+

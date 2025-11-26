@@ -105,3 +105,5 @@ Führen Sie aus, um aktuellen Status zu prüfen:
 php scripts/find-supabase-usage.php
 ```
 
+
+

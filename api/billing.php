@@ -855,6 +855,10 @@ try {
                 $amounts = $stmt->fetchAll(PDO::FETCH_ASSOC);
                 foreach ($amounts as &$amount) {
                     $amount['is_active'] = (bool)$amount['is_active'];
+                    // Convert DECIMAL to float for JavaScript
+                    $amount['amount'] = (float)$amount['amount'];
+                    $amount['bonus_percentage'] = (float)$amount['bonus_percentage'];
+                    $amount['sort_order'] = (int)$amount['sort_order'];
                 }
                 echo successResponse($amounts);
             } elseif ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -975,4 +979,6 @@ try {
 }
 
 ?>
+
+
 

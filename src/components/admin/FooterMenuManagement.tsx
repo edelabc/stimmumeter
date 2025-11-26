@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Plus, Edit2, Trash2, Save, X } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
 import { getAllAgreements, Vereinbarung } from '../../lib/agreement.service';
+import { getAllFooterMenuItems, createFooterMenuItem, updateFooterMenuItem, deleteFooterMenuItem, FooterMenuItem } from '../../lib/menu.service';
 
 interface FooterMenuItem {
   id: string;
@@ -46,14 +46,15 @@ export function FooterMenuManagement() {
   };
 
   const loadFooterItems = async () => {
-    const { data } = await supabase
-      .from('footer_menu_items')
-      .select('*')
-      .order('category')
-      .order('position');
-
-    if (data) setItems(data);
-    setLoading(false);
+    try {
+      const data = await getAllFooterMenuItems();
+      setItems(data);
+    } catch (error) {
+      console.error('Fehler beim Laden der Footer-Menü-Items:', error);
+      setItems([]); // Leeres Array statt null
+    } finally {
+      setLoading(false);
+    }
   };
 
   const loadAgreements = async () => {
@@ -67,21 +68,21 @@ export function FooterMenuManagement() {
   };
 
   const handleSave = async () => {
-    if (editingId) {
-      await supabase
-        .from('footer_menu_items')
-        .update(formData)
-        .eq('id', editingId);
-    } else {
-      await supabase
-        .from('footer_menu_items')
-        .insert(formData);
-    }
+    try {
+      if (editingId) {
+        await updateFooterMenuItem(editingId, formData);
+      } else {
+        await createFooterMenuItem(formData);
+      }
 
-    setEditingId(null);
-    setIsAdding(false);
-    setFormData({ title: '', url: '', position: 0, is_active: true, category: 'general', linked_agreement_id: null, slug: null });
-    loadFooterItems();
+      setEditingId(null);
+      setIsAdding(false);
+      setFormData({ title: '', url: '', position: 0, is_active: true, category: 'general', linked_agreement_id: null, slug: null });
+      loadFooterItems();
+    } catch (error) {
+      console.error('Fehler beim Speichern:', error);
+      alert('Fehler beim Speichern des Footer-Menü-Items');
+    }
   };
 
   const handleEdit = (item: FooterMenuItem) => {
@@ -99,8 +100,13 @@ export function FooterMenuManagement() {
 
   const handleDelete = async (id: string) => {
     if (confirm('Footer-Menüpunkt wirklich löschen?')) {
-      await supabase.from('footer_menu_items').delete().eq('id', id);
-      loadFooterItems();
+      try {
+        await deleteFooterMenuItem(id);
+        loadFooterItems();
+      } catch (error) {
+        console.error('Fehler beim Löschen:', error);
+        alert('Fehler beim Löschen des Footer-Menü-Items');
+      }
     }
   };
 

@@ -111,3 +111,5 @@ SET v.`slug` = `generate_agreement_slug`(t.`titel`, v.`id`)
 WHERE v.`status` = 'Unterzeichnet' AND (v.`slug` IS NULL OR v.`slug` = '');
 
 
+
+

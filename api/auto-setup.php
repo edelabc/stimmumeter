@@ -320,6 +320,38 @@ class AutoSetup {
                     ON DUPLICATE KEY UPDATE `min_amount` = VALUES(`min_amount`)");
                 error_log("✅ Standard YRA-Config eingefügt");
             }
+            
+            // Legal Pages - AI Terms
+            $check = $this->pdo->query("SELECT COUNT(*) FROM legal_pages WHERE page_type='ai-terms'")->fetchColumn();
+            if ($check == 0) {
+                $stmt = $this->pdo->prepare("INSERT INTO `legal_pages` (`id`, `page_type`, `title`, `content`, `is_active`, `created_at`, `updated_at`) VALUES (?, 'ai-terms', 'KI-Nutzungsbedingungen', ?, 1, NOW(), NOW())");
+                $stmt->execute([
+                    '10000000-0000-0000-0000-000000000001',
+                    '# KI-Nutzungsbedingungen
+
+Diese Bedingungen regeln die Nutzung der KI-Funktionen in unserer Anwendung.
+
+## 1. Datenverarbeitung
+- Ihre Daten werden verschlüsselt verarbeitet
+- KI-Analysen erfolgen über externe Provider (OpenAI, Google, Anthropic, xAI, Manus)
+- Sie können die Nutzung jederzeit beenden
+
+## 2. Datenschutz
+- Wir geben Ihre Daten nicht an Dritte weiter
+- KI-Provider verarbeiten Daten gemäß ihrer Datenschutzrichtlinien
+
+## 3. Haftungsausschluss
+- KI-Analysen ersetzen keine medizinische Beratung
+- Bei psychischen Problemen konsultieren Sie bitte einen Facharzt
+- Wir übernehmen keine Haftung für KI-generierte Inhalte
+
+## 4. Ihre Rechte
+- Sie können KI-Funktionen jederzeit deaktivieren
+- Sie können Ihre KI-Konfigurationen löschen
+- Sie haben Zugriff auf alle Ihre gespeicherten Daten'
+                ]);
+                error_log("✅ AI-Terms Legal Page eingefügt");
+            }
         } catch (PDOException $e) {
             error_log("⚠️ Fehler beim Einfügen der Standard-Daten: " . $e->getMessage());
         }

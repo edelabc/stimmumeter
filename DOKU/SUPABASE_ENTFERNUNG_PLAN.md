@@ -114,3 +114,5 @@ Das Projekt verwendet aktuell Supabase für:
 
 **Status:** 🚧 In Arbeit
 
+
+

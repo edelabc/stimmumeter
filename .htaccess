@@ -8,11 +8,12 @@
 DirectoryIndex index.html index.php
 
 # HTTPS-Umleitung - Alle HTTP-Requests zu HTTPS umleiten
-<IfModule mod_rewrite.c>
-  RewriteEngine On
-  RewriteCond %{HTTPS} off
-  RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
-</IfModule>
+# DEAKTIVIERT für Entwicklung - CORS-Probleme mit localhost:5173
+# <IfModule mod_rewrite.c>
+#   RewriteEngine On
+#   RewriteCond %{HTTPS} off
+#   RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>
 
 # React/Vite SPA Routing
 <IfModule mod_rewrite.c>
@@ -38,11 +39,12 @@ DirectoryIndex index.html index.php
 </FilesMatch>
 
 # PHP-Dateien nur aus api/ Verzeichnis ausführen
-<FilesMatch "\.php$">
-    <If "%{REQUEST_URI} !~ m#^/api/#">
-        Require all denied
-    </If>
-</FilesMatch>
+# TEMPORÄR DEAKTIVIERT für CORS-Debugging
+# <FilesMatch "\.php$">
+#     <If "%{REQUEST_URI} !~ m#^/api/#">
+#         Require all denied
+#     </If>
+# </FilesMatch>
 
 # Verzeichnis-Listing deaktivieren
 Options -Indexes
@@ -117,4 +119,6 @@ Options -Indexes
   AddType font/woff .woff
   AddType font/woff2 .woff2
 </IfModule>
+
+
 

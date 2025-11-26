@@ -55,6 +55,19 @@ export function AITermsModal({ isOpen, onClose, onAccept, provider, userId }: AI
       setTermsContent('<p>Fehler beim Laden der Nutzungsbedingungen.</p>');
     } finally {
       setLoading(false);
+      // Prüfe nach dem Laden, ob Content scrollbar ist
+      setTimeout(() => checkIfScrollable(), 100);
+    }
+  };
+
+  const checkIfScrollable = () => {
+    const element = document.querySelector('[data-terms-content]');
+    if (element) {
+      const isScrollable = element.scrollHeight > element.clientHeight;
+      // Wenn nicht scrollbar, erlaube sofort das Akzeptieren
+      if (!isScrollable) {
+        setHasScrolledToBottom(true);
+      }
     }
   };
 
@@ -163,7 +176,7 @@ export function AITermsModal({ isOpen, onClose, onAccept, provider, userId }: AI
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-6" onScroll={handleScroll}>
+        <div className="flex-1 overflow-y-auto p-6" onScroll={handleScroll} data-terms-content>
           {loading ? (
             <div className="text-center py-8">
               <div className="w-12 h-12 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mx-auto mb-4" />

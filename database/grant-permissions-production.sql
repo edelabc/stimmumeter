@@ -32,3 +32,5 @@ SHOW GRANTS FOR 'TrastimoGmbHsql6'@'localhost';
 -- Status anzeigen
 SELECT 'Berechtigungen erfolgreich erteilt!' AS Status;
 
+
+

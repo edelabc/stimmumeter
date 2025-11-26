@@ -62,3 +62,5 @@ DEALLOCATE PREPARE alterIfNotExists;
 CREATE INDEX IF NOT EXISTS idx_payment_providers_code ON payment_providers(code);
 CREATE INDEX IF NOT EXISTS idx_payment_providers_active ON payment_providers(is_active);
 
+
+

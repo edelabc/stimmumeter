@@ -2,6 +2,7 @@ import OpenAI from 'openai';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import Anthropic from '@anthropic-ai/sdk';
 import { AIConfiguration, MoodEntryWithValues, Pseudonym, MoodIndicator } from './supabase';
+import { decryptValue } from './encryption';
 
 export interface AIAnalysisRequest {
   pseudonym: Pseudonym;
@@ -16,6 +17,24 @@ export interface AIAnalysisResponse {
   recommendations: string[];
   rawResponse?: string;
 }
+
+/**
+ * Hilfsfunktion: Entschlüsselt den API-Key einer Konfiguration
+ * Prüft ob der Key verschlüsselt ist, bevor Entschlüsselung versucht wird
+ */
+const prepareConfig = (config: AIConfiguration): AIConfiguration => {
+  // Prüfe ob der Key bereits im Klartext vorliegt
+  // Verschlüsselte Keys sind Base64 und enthalten keine "sk-" Präfixe
+  const isEncrypted = config.api_key && 
+                      !config.api_key.startsWith('sk-') && 
+                      !config.api_key.startsWith('pk-') &&
+                      !config.api_key.includes('AIza'); // Google API Keys
+  
+  return {
+    ...config,
+    api_key: isEncrypted ? decryptValue(config.api_key) : config.api_key
+  };
+};
 
 const createSystemPrompt = (pseudonym: Pseudonym, indicators: MoodIndicator[]): string => {
   const personalInfo = `
@@ -69,51 +88,53 @@ const formatMoodData = (entries: MoodEntryWithValues[]): string => {
 export class AIService {
   static async testConnection(config: AIConfiguration): Promise<{ success: boolean; message: string; details?: any }> {
     try {
+      // Entschlüssle API-Key vor Verwendung
+      const preparedConfig = prepareConfig(config);
       const testPrompt = 'Antworte mit "OK" wenn du diese Nachricht erhältst.';
 
-      switch (config.provider) {
+      switch (preparedConfig.provider) {
         case 'openai': {
           const client = new OpenAI({
-            apiKey: config.api_key,
+            apiKey: preparedConfig.api_key,
             dangerouslyAllowBrowser: true
           });
           const response = await client.chat.completions.create({
-            model: config.model,
+            model: preparedConfig.model,
             messages: [{ role: 'user', content: testPrompt }],
             max_tokens: 10
           });
           return {
             success: true,
             message: 'Verbindung erfolgreich! API-Key ist gültig.',
-            details: { model: config.model, response: response.choices[0]?.message?.content }
+            details: { model: preparedConfig.model, response: response.choices[0]?.message?.content }
           };
         }
 
         case 'gemini': {
-          const genAI = new GoogleGenerativeAI(config.api_key);
-          const model = genAI.getGenerativeModel({ model: config.model });
+          const genAI = new GoogleGenerativeAI(preparedConfig.api_key);
+          const model = genAI.getGenerativeModel({ model: preparedConfig.model });
           const result = await model.generateContent(testPrompt);
           return {
             success: true,
             message: 'Verbindung erfolgreich! API-Key ist gültig.',
-            details: { model: config.model, response: result.response.text() }
+            details: { model: preparedConfig.model, response: result.response.text() }
           };
         }
 
         case 'claude': {
           const client = new Anthropic({
-            apiKey: config.api_key,
+            apiKey: preparedConfig.api_key,
             dangerouslyAllowBrowser: true
           });
           const response = await client.messages.create({
-            model: config.model,
+            model: preparedConfig.model,
             max_tokens: 10,
             messages: [{ role: 'user', content: testPrompt }]
           });
           return {
             success: true,
             message: 'Verbindung erfolgreich! API-Key ist gültig.',
-            details: { model: config.model, response: response.content[0] }
+            details: { model: preparedConfig.model, response: response.content[0] }
           };
         }
 
@@ -122,10 +143,10 @@ export class AIService {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${config.api_key}`
+              'Authorization': `Bearer ${preparedConfig.api_key}`
             },
             body: JSON.stringify({
-              model: config.model,
+              model: preparedConfig.model,
               messages: [{ role: 'user', content: testPrompt }],
               max_tokens: 10
             })
@@ -138,7 +159,7 @@ export class AIService {
           return {
             success: true,
             message: 'Verbindung erfolgreich! API-Key ist gültig.',
-            details: { model: config.model, response: data.choices[0]?.message?.content }
+            details: { model: preparedConfig.model, response: data.choices[0]?.message?.content }
           };
         }
 
@@ -147,10 +168,10 @@ export class AIService {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${config.api_key}`
+              'Authorization': `Bearer ${preparedConfig.api_key}`
             },
             body: JSON.stringify({
-              model: config.model,
+              model: preparedConfig.model,
               messages: [{ role: 'user', content: testPrompt }],
               max_tokens: 10
             })
@@ -163,12 +184,12 @@ export class AIService {
           return {
             success: true,
             message: 'Verbindung erfolgreich! API-Key ist gültig.',
-            details: { model: config.model, response: data.choices[0]?.message?.content }
+            details: { model: preparedConfig.model, response: data.choices[0]?.message?.content }
           };
         }
 
         default:
-          throw new Error(`Unsupported AI provider: ${config.provider}`);
+          throw new Error(`Unsupported AI provider: ${preparedConfig.provider}`);
       }
     } catch (error: any) {
       return {
@@ -182,16 +203,17 @@ export class AIService {
     config: AIConfiguration,
     request: AIAnalysisRequest
   ): Promise<AIAnalysisResponse> {
+    const preparedConfig = prepareConfig(config);
     const client = new OpenAI({
-      apiKey: config.api_key,
+      apiKey: preparedConfig.api_key,
       dangerouslyAllowBrowser: true
     });
 
-    const systemPrompt = config.system_prompt || createSystemPrompt(request.pseudonym, request.indicators);
+    const systemPrompt = preparedConfig.system_prompt || createSystemPrompt(request.pseudonym, request.indicators);
     const moodData = formatMoodData(request.moodEntries);
 
     const response = await client.chat.completions.create({
-      model: config.model,
+      model: preparedConfig.model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: `Analysiere folgende Stimmungsdaten:\n\n${moodData}` }
@@ -208,10 +230,11 @@ export class AIService {
     config: AIConfiguration,
     request: AIAnalysisRequest
   ): Promise<AIAnalysisResponse> {
-    const genAI = new GoogleGenerativeAI(config.api_key);
-    const model = genAI.getGenerativeModel({ model: config.model });
+    const preparedConfig = prepareConfig(config);
+    const genAI = new GoogleGenerativeAI(preparedConfig.api_key);
+    const model = genAI.getGenerativeModel({ model: preparedConfig.model });
 
-    const systemPrompt = config.system_prompt || createSystemPrompt(request.pseudonym, request.indicators);
+    const systemPrompt = preparedConfig.system_prompt || createSystemPrompt(request.pseudonym, request.indicators);
     const moodData = formatMoodData(request.moodEntries);
 
     const prompt = `${systemPrompt}\n\nAnalysiere folgende Stimmungsdaten:\n\n${moodData}`;
@@ -225,16 +248,17 @@ export class AIService {
     config: AIConfiguration,
     request: AIAnalysisRequest
   ): Promise<AIAnalysisResponse> {
+    const preparedConfig = prepareConfig(config);
     const client = new Anthropic({
-      apiKey: config.api_key,
+      apiKey: preparedConfig.api_key,
       dangerouslyAllowBrowser: true
     });
 
-    const systemPrompt = config.system_prompt || createSystemPrompt(request.pseudonym, request.indicators);
+    const systemPrompt = preparedConfig.system_prompt || createSystemPrompt(request.pseudonym, request.indicators);
     const moodData = formatMoodData(request.moodEntries);
 
     const response = await client.messages.create({
-      model: config.model,
+      model: preparedConfig.model,
       max_tokens: 2000,
       system: systemPrompt,
       messages: [
@@ -256,17 +280,18 @@ export class AIService {
     config: AIConfiguration,
     request: AIAnalysisRequest
   ): Promise<AIAnalysisResponse> {
-    const systemPrompt = config.system_prompt || createSystemPrompt(request.pseudonym, request.indicators);
+    const preparedConfig = prepareConfig(config);
+    const systemPrompt = preparedConfig.system_prompt || createSystemPrompt(request.pseudonym, request.indicators);
     const moodData = formatMoodData(request.moodEntries);
 
     const response = await fetch('https://api.x.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.api_key}`
+        'Authorization': `Bearer ${preparedConfig.api_key}`
       },
       body: JSON.stringify({
-        model: config.model,
+        model: preparedConfig.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Analysiere folgende Stimmungsdaten:\n\n${moodData}` }
@@ -288,17 +313,18 @@ export class AIService {
     config: AIConfiguration,
     request: AIAnalysisRequest
   ): Promise<AIAnalysisResponse> {
-    const systemPrompt = config.system_prompt || createSystemPrompt(request.pseudonym, request.indicators);
+    const preparedConfig = prepareConfig(config);
+    const systemPrompt = preparedConfig.system_prompt || createSystemPrompt(request.pseudonym, request.indicators);
     const moodData = formatMoodData(request.moodEntries);
 
     const response = await fetch('https://api.manus.ai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.api_key}`
+        'Authorization': `Bearer ${preparedConfig.api_key}`
       },
       body: JSON.stringify({
-        model: config.model,
+        model: preparedConfig.model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: `Analysiere folgende Stimmungsdaten:\n\n${moodData}` }

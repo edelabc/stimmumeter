@@ -68,3 +68,5 @@ echo "   Gesamt Dateien: " . count($files) . "\n";
 echo "   Gesamt Supabase-Aufrufe: $totalCalls\n";
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n";
 
+
+

@@ -206,3 +206,5 @@ Das Problem wurde durch folgende Änderungen behoben:
 
 **✅ Fertig!** Nach diesen Schritten sollten die CSP-Fehler behoben sein.
 
+
+

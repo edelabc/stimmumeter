@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Brain, Save, Eye, EyeOff, AlertCircle, Check } from 'lucide-react';
-import { supabase } from '../../lib/supabase';
+import { getAllAIProviderSettings, updateAIProviderSetting, AIProviderSetting } from '../../lib/ai-provider.service';
 
 interface AIProviderSetting {
   id: string;
@@ -34,22 +34,18 @@ export function AIModuleManagement() {
   const loadProviders = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('ai_provider_settings')
-        .select('*')
-        .order('provider');
-
-      if (error) throw error;
-      setProviders(data || []);
+      const data = await getAllAIProviderSettings();
+      setProviders(data);
 
       const initialPrompts: { [key: string]: string } = {};
-      data?.forEach(p => {
+      data.forEach(p => {
         initialPrompts[p.id] = p.system_prompt || '';
       });
       setEditingPrompt(initialPrompts);
     } catch (err) {
       console.error('Error loading providers:', err);
       setError('Fehler beim Laden der Provider-Einstellungen');
+      setProviders([]); // Leeres Array bei Fehler
     } finally {
       setLoading(false);
     }
@@ -57,15 +53,12 @@ export function AIModuleManagement() {
 
   const handleToggleProvider = async (id: string, currentState: boolean) => {
     try {
-      const { error } = await supabase
-        .from('ai_provider_settings')
-        .update({ is_enabled: !currentState, updated_at: new Date().toISOString() })
-        .eq('id', id);
-
-      if (error) throw error;
+      const updatedProvider = await updateAIProviderSetting(id, {
+        is_enabled: !currentState
+      });
 
       setProviders(providers.map(p =>
-        p.id === id ? { ...p, is_enabled: !currentState } : p
+        p.id === id ? updatedProvider : p
       ));
       setSuccess(`Provider ${!currentState ? 'aktiviert' : 'deaktiviert'}`);
       setTimeout(() => setSuccess(null), 3000);
@@ -77,18 +70,12 @@ export function AIModuleManagement() {
 
   const handleSavePrompt = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('ai_provider_settings')
-        .update({
-          system_prompt: editingPrompt[id] || null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', id);
-
-      if (error) throw error;
+      const updatedProvider = await updateAIProviderSetting(id, {
+        system_prompt: editingPrompt[id] || null
+      });
 
       setProviders(providers.map(p =>
-        p.id === id ? { ...p, system_prompt: editingPrompt[id] || null } : p
+        p.id === id ? updatedProvider : p
       ));
       setSuccess('System Prompt gespeichert');
       setTimeout(() => setSuccess(null), 3000);

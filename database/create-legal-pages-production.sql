@@ -165,3 +165,5 @@ SELECT 'Legal Pages erfolgreich erstellt!' AS Status;
 SELECT COUNT(*) AS 'legal_pages_count' FROM `legal_pages`;
 SELECT `page_type`, `title`, `is_active` FROM `legal_pages` ORDER BY `page_type`;
 
+
+

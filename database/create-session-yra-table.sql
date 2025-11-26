@@ -21,3 +21,5 @@ CREATE TABLE IF NOT EXISTS `session_yra` (
 SELECT '✅ Tabelle session_yra erfolgreich erstellt!' AS Status;
 
 
+
+

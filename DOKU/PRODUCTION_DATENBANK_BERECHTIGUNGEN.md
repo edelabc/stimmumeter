@@ -121,3 +121,5 @@ Stellen Sie sicher, dass diese Datei nicht öffentlich zugänglich ist:
 - Dateirechte: `chmod 640 config.production.php`
 - Nicht in Git committen (sollte in `.gitignore` sein)
 
+
+
