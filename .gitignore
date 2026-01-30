@@ -33,6 +33,8 @@ dist-ssr
 # Build outputs
 dist/
 build/
+assets/
+_redirects
 
 # Supabase
 .supabase/
