@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAMELI - Global Mood Intelligence</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #2563eb;
+            --success: #10b981;
+            --warning: #f59e0b;
+            --danger: #ef4444;
+            --neutral: #64748b;
+            --dark: #0f172a;
+            --light: #f8fafc;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #000000;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        /* Loading Screen */
+        .loading-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: #000;
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            transition: opacity 0.5s ease;
+        }
+
+        .loading-globe {
+            width: 100px;
+            height: 100px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #2563eb, #0ea5e9);
+            animation: spin 2s linear infinite;
+            margin-bottom: 30px;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        /* Main Layout */
+        .app-container {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            height: 100vh;
+            position: relative;
+        }
+
+        /* Left Panel */
+        .control-panel {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            overflow-y: auto;
+            position: relative;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 1.8rem;
+            font-weight: 700;
+            margin-bottom: 5px;
+            background: linear-gradient(135deg, #fff, #94a3b8);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .tagline {
+            font-size: 0.75rem;
+            color: #64748b;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 40px;
+        }
+
+        /* Location Permission */
+        .location-request {
+            background: rgba(37, 99, 235, 0.1);
+            border: 1px solid rgba(37, 99, 235, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .location-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #f59e0b;
+            animation: pulse 2s infinite;
+        }
+
+        .status-dot.active {
+            background: #10b981;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .btn-location {
+            width: 100%;
+            padding: 12px 20px;
+            background: linear-gradient(135deg, #2563eb, #1e40af);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-location:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 20px rgba(37, 99, 235, 0.3);
+        }
+
+        .btn-location:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Current Location Info */
+        .location-info {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .location-name {
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .location-coords {
+            font-size: 0.85rem;
+            color: #64748b;
+            font-family: monospace;
+        }
+
+        /* General Mood Assessment */
+        .mood-assessment {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 0.9rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 15px;
+        }
+
+        .mood-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .mood-btn {
+            padding: 15px 10px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: #94a3b8;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .mood-emoji {
+            font-size: 1.5rem;
+        }
+
+        .mood-btn:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-2px);
+        }
+
+        .mood-btn.positive:hover {
+            border-color: #10b981;
+            color: #10b981;
+        }
+
+        .mood-btn.neutral:hover {
+            border-color: #f59e0b;
+            color: #f59e0b;
+        }
+
+        .mood-btn.negative:hover {
+            border-color: #ef4444;
+            color: #ef4444;
+        }
+
+        /* Avatar Selection Info */
+        .avatar-info {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 30px;
+        }
+
+        .avatar-count {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #10b981;
+        }
+
+        .avatar-description {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-top: 5px;
+        }
+
+        /* Stats */
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 15px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            padding: 15px;
+        }
+
+        .stat-value {
+            font-size: 1.3rem;
+            font-weight: 600;
+            color: #f59e0b;
+        }
+
+        .stat-label {
+            font-size: 0.75rem;
+            color: #64748b;
+            margin-top: 3px;
+        }
+
+        /* Login CTA */
+        .login-cta {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.1), rgba(139, 92, 246, 0.1));
+            border: 1px solid rgba(37, 99, 235, 0.2);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .login-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .login-features {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+
+        .btn-login {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #8b5cf6, #6366f1);
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-login:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+        }
+
+        /* Right Side - Globe Container */
+        .globe-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            background: #000;
+        }
+
+        /* Google Earth Embed */
+        #earth-frame {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* Overlay for Avatars */
+        .avatars-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        /* Walking Avatars */
+        .avatar {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            pointer-events: all;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            animation: walk 20s linear infinite;
+        }
+
+        @keyframes walk {
+            0% { transform: translateX(0) translateY(0); }
+            25% { transform: translateX(100px) translateY(50px); }
+            50% { transform: translateX(50px) translateY(100px); }
+            75% { transform: translateX(-50px) translateY(50px); }
+            100% { transform: translateX(0) translateY(0); }
+        }
+
+        .avatar-icon {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+
+        .avatar.positive .avatar-icon {
+            background: linear-gradient(135deg, #10b981, #059669);
+        }
+
+        .avatar.neutral .avatar-icon {
+            background: linear-gradient(135deg, #f59e0b, #d97706);
+        }
+
+        .avatar.negative .avatar-icon {
+            background: linear-gradient(135deg, #ef4444, #dc2626);
+        }
+
+        .avatar:hover {
+            transform: scale(1.2);
+            z-index: 100;
+        }
+
+        /* Avatar Popup */
+        .avatar-popup {
+            position: absolute;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 15px;
+            min-width: 200px;
+            display: none;
+            z-index: 200;
+        }
+
+        .avatar-popup.show {
+            display: block;
+        }
+
+        .popup-header {
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .popup-mood {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .popup-mood-btn {
+            flex: 1;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #94a3b8;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .popup-mood-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        /* Heat Map Overlay */
+        .heat-map-toggle {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px 20px;
+            cursor: pointer;
+            z-index: 100;
+            transition: all 0.2s ease;
+        }
+
+        .heat-map-toggle:hover {
+            background: rgba(37, 99, 235, 0.2);
+            border-color: rgba(37, 99, 235, 0.5);
+        }
+
+        /* Mood Zones on Map */
+        .mood-zone {
+            position: absolute;
+            border-radius: 50%;
+            opacity: 0.3;
+            filter: blur(20px);
+            pointer-events: none;
+            animation: breathe 4s ease-in-out infinite;
+        }
+
+        @keyframes breathe {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .mood-zone.positive {
+            background: radial-gradient(circle, #10b981, transparent);
+        }
+
+        .mood-zone.neutral {
+            background: radial-gradient(circle, #f59e0b, transparent);
+        }
+
+        .mood-zone.negative {
+            background: radial-gradient(circle, #ef4444, transparent);
+        }
+
+        /* Forecast Panel (for logged-in users) */
+        .forecast-panel {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 20px;
+            width: 350px;
+            display: none;
+            z-index: 100;
+        }
+
+        .forecast-panel.show {
+            display: block;
+        }
+
+        .forecast-title {
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .forecast-days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+            margin-bottom: 15px;
+        }
+
+        .forecast-day {
+            text-align: center;
+            padding: 10px 5px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 6px;
+            font-size: 0.75rem;
+        }
+
+        .forecast-day-name {
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+
+        .forecast-day-mood {
+            font-size: 1.2rem;
+        }
+
+        .forecast-accuracy {
+            font-size: 0.85rem;
+            color: #94a3b8;
+        }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .app-container {
+                grid-template-columns: 1fr;
+            }
+
+            .control-panel {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                top: auto;
+                height: auto;
+                max-height: 50vh;
+                border-right: none;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 20px 20px 0 0;
+            }
+
+            .globe-container {
+                height: 100vh;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen">
+        <div class="loading-globe"></div>
+        <div style="color: #64748b; font-size: 0.9rem;">Initialisiere Global Mood Intelligence...</div>
+    </div>
+
+    <!-- Main App -->
+    <div class="app-container">
+        <!-- Left Control Panel -->
+        <div class="control-panel">
+            <div class="logo">WAMELI</div>
+            <div class="tagline">Global Mood Intelligence</div>
+
+            <!-- Location Permission -->
+            <div class="location-request">
+                <div class="location-status">
+                    <span class="status-dot" id="locationDot"></span>
+                    <span id="locationStatusText">Standort erforderlich</span>
+                </div>
+                <button class="btn-location" id="btnLocation" onclick="requestLocation()">
+                    📍 Standort freigeben
+                </button>
+            </div>
+
+            <!-- Current Location -->
+            <div class="location-info" id="locationInfo" style="display: none;">
+                <div class="location-name" id="currentLocation">-</div>
+                <div class="location-coords" id="currentCoords">-</div>
+            </div>
+
+            <!-- General Mood Assessment -->
+            <div class="mood-assessment" id="moodAssessment" style="display: none;">
+                <div class="section-title">Allgemeine Stimmungslage hier</div>
+                <div class="mood-grid">
+                    <button class="mood-btn positive" onclick="setGeneralMood('positive')">
+                        <span class="mood-emoji">😊</span>
+                        <span>Positiv</span>
+                    </button>
+                    <button class="mood-btn neutral" onclick="setGeneralMood('neutral')">
+                        <span class="mood-emoji">😐</span>
+                        <span>Neutral</span>
+                    </button>
+                    <button class="mood-btn negative" onclick="setGeneralMood('negative')">
+                        <span class="mood-emoji">😔</span>
+                        <span>Negativ</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Avatar Info -->
+            <div class="avatar-info" id="avatarInfo" style="display: none;">
+                <div class="avatar-count" id="avatarCount">0</div>
+                <div class="avatar-description">Personen in deiner Nähe</div>
+                <div style="margin-top: 10px; font-size: 0.8rem; color: #64748b;">
+                    Klicke auf die Avatare um deren Stimmung einzuschätzen
+                </div>
+            </div>
+
+            <!-- Stats -->
+            <div class="stats-grid" id="statsGrid" style="display: none;">
+                <div class="stat-card">
+                    <div class="stat-value" id="yraBalance">0</div>
+                    <div class="stat-label">YRA Balance</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="assessments">0</div>
+                    <div class="stat-label">Einschätzungen</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="accuracy">0%</div>
+                    <div class="stat-label">Genauigkeit</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="streak">0</div>
+                    <div class="stat-label">Serie</div>
+                </div>
+            </div>
+
+            <!-- Login CTA -->
+            <div class="login-cta">
+                <div class="login-title">Erweiterte Features</div>
+                <div class="login-features">
+                    • KI-Prognosen bis 14 Tage<br>
+                    • Personalisierte Umfeld-Erfassung<br>
+                    • Historische Stimmungsanalysen<br>
+                    • Wetter- & Zeit-Korrelationen
+                </div>
+                <button class="btn-login" onclick="showLogin()">
+                    Jetzt einloggen →
+                </button>
+            </div>
+        </div>
+
+        <!-- Right Globe Container -->
+        <div class="globe-container">
+            <!-- Google Earth Embed -->
+            <iframe 
+                id="earth-frame"
+                src="https://earth.google.com/web/@50.9375,6.9603,1000a,35y,0h,0t,0r"
+                allowfullscreen>
+            </iframe>
+
+            <!-- Avatars Overlay -->
+            <div class="avatars-overlay" id="avatarsOverlay">
+                <!-- Mood Zones -->
+                <div class="mood-zone positive" style="width: 200px; height: 200px; top: 20%; left: 30%;"></div>
+                <div class="mood-zone negative" style="width: 150px; height: 150px; top: 50%; left: 60%;"></div>
+                <div class="mood-zone neutral" style="width: 180px; height: 180px; top: 70%; left: 20%;"></div>
+
+                <!-- Walking Avatars will be added here -->
+            </div>
+
+            <!-- Heat Map Toggle -->
+            <button class="heat-map-toggle" onclick="toggleHeatMap()">
+                🗺️ Heat Map
+            </button>
+
+            <!-- Forecast Panel (shown after login) -->
+            <div class="forecast-panel" id="forecastPanel">
+                <div class="forecast-title">
+                    <span>📊</span>
+                    <span>14-Tage Prognose</span>
+                </div>
+                <div class="forecast-days">
+                    <div class="forecast-day">
+                        <div class="forecast-day-name">Mo</div>
+                        <div class="forecast-day-mood">😊</div>
+                    </div>
+                    <div class="forecast-day">
+                        <div class="forecast-day-name">Di</div>
+                        <div class="forecast-day-mood">😐</div>
+                    </div>
+                    <div class="forecast-day">
+                        <div class="forecast-day-name">Mi</div>
+                        <div class="forecast-day-mood">😊</div>
+                    </div>
+                    <div class="forecast-day">
+                        <div class="forecast-day-name">Do</div>
+                        <div class="forecast-day-mood">😔</div>
+                    </div>
+                    <div class="forecast-day">
+                        <div class="forecast-day-name">Fr</div>
+                        <div class="forecast-day-mood">😊</div>
+                    </div>
+                    <div class="forecast-day">
+                        <div class="forecast-day-name">Sa</div>
+                        <div class="forecast-day-mood">😊</div>
+                    </div>
+                    <div class="forecast-day">
+                        <div class="forecast-day-name">So</div>
+                        <div class="forecast-day-mood">😐</div>
+                    </div>
+                </div>
+                <div class="forecast-accuracy">
+                    Prognose-Genauigkeit: 87% basierend auf historischen Daten
+                </div>
+            </div>
+
+            <!-- Avatar Popup -->
+            <div class="avatar-popup" id="avatarPopup">
+                <div class="popup-header">Person einschätzen</div>
+                <div style="font-size: 0.85rem; color: #64748b;">
+                    Wie schätzt du die Stimmung dieser Person ein?
+                </div>
+                <div class="popup-mood">
+                    <button class="popup-mood-btn" onclick="assessAvatar('positive')">😊</button>
+                    <button class="popup-mood-btn" onclick="assessAvatar('neutral')">😐</button>
+                    <button class="popup-mood-btn" onclick="assessAvatar('negative')">😔</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let userLocation = null;
+        let avatars = [];
+        let yraBalance = 0;
+        let assessmentCount = 0;
+        let currentAvatar = null;
+        let isLoggedIn = false;
+
+        // Initialize
+        window.onload = function() {
+            setTimeout(() => {
+                document.getElementById('loadingScreen').style.opacity = '0';
+                setTimeout(() => {
+                    document.getElementById('loadingScreen').style.display = 'none';
+                }, 500);
+            }, 2000);
+        };
+
+        // Request location permission
+        function requestLocation() {
+            if (navigator.geolocation) {
+                document.getElementById('btnLocation').disabled = true;
+                document.getElementById('btnLocation').textContent = '🔄 Lokalisiere...';
+                
+                navigator.geolocation.getCurrentPosition(
+                    (position) => {
+                        userLocation = {
+                            lat: position.coords.latitude,
+                            lng: position.coords.longitude
+                        };
+                        onLocationReceived();
+                    },
+                    (error) => {
+                        alert('Bitte erlaube den Standortzugriff für die volle Funktionalität');
+                        document.getElementById('btnLocation').disabled = false;
+                        document.getElementById('btnLocation').textContent = '📍 Standort freigeben';
+                    }
+                );
+            } else {
+                alert('Geolocation wird von diesem Browser nicht unterstützt');
+            }
+        }
+
+        // Handle location received
+        function onLocationReceived() {
+            // Update UI
+            document.getElementById('locationDot').classList.add('active');
+            document.getElementById('locationStatusText').textContent = 'Standort aktiv';
+            document.getElementById('btnLocation').style.display = 'none';
+            
+            // Show location info
+            document.getElementById('locationInfo').style.display = 'block';
+            document.getElementById('currentLocation').textContent = 'Köln, Deutschland';
+            document.getElementById('currentCoords').textContent = 
+                `${userLocation.lat.toFixed(4)}°, ${userLocation.lng.toFixed(4)}°`;
+            
+            // Show mood assessment
+            document.getElementById('moodAssessment').style.display = 'block';
+            document.getElementById('avatarInfo').style.display = 'block';
+            document.getElementById('statsGrid').style.display = 'block';
+            
+            // Update Google Earth view to user location
+            document.getElementById('earth-frame').src = 
+                `https://earth.google.com/web/@${userLocation.lat},${userLocation.lng},1000a,35y,0h,0t,0r`;
+            
+            // Generate avatars
+            generateAvatars();
+        }
+
+        // Generate walking avatars
+        function generateAvatars() {
+            const overlay = document.getElementById('avatarsOverlay');
+            const moods = ['positive', 'neutral', 'negative'];
+            const emojis = {
+                'positive': '😊',
+                'neutral': '😐',
+                'negative': '😔'
+            };
+            
+            // Generate 8-12 random avatars
+            const avatarCount = Math.floor(Math.random() * 5) + 8;
+            
+            for (let i = 0; i < avatarCount; i++) {
+                const avatar = document.createElement('div');
+                avatar.className = 'avatar';
+                avatar.id = `avatar-${i}`;
+                
+                const mood = moods[Math.floor(Math.random() * moods.length)];
+                avatar.classList.add(mood);
+                
+                // Random position
+                avatar.style.left = Math.random() * 80 + 10 + '%';
+                avatar.style.top = Math.random() * 80 + 10 + '%';
+                
+                // Random animation delay
+                avatar.style.animationDelay = Math.random() * 20 + 's';
+                
+                // Avatar icon
+                const icon = document.createElement('div');
+                icon.className = 'avatar-icon';
+                icon.innerHTML = emojis[mood];
+                avatar.appendChild(icon);
+                
+                // Click handler
+                avatar.onclick = function(e) {
+                    showAvatarPopup(e, avatar);
+                };
+                
+                overlay.appendChild(avatar);
+                avatars.push(avatar);
+            }
+            
+            // Update avatar count
+            document.getElementById('avatarCount').textContent = avatarCount;
+        }
+
+        // Show avatar popup
+        function showAvatarPopup(event, avatar) {
+            const popup = document.getElementById('avatarPopup');
+            currentAvatar = avatar;
+            
+            // Position popup near avatar
+            popup.style.left = event.pageX + 10 + 'px';
+            popup.style.top = event.pageY + 10 + 'px';
+            popup.classList.add('show');
+            
+            // Hide popup when clicking elsewhere
+            setTimeout(() => {
+                document.addEventListener('click', hideAvatarPopup);
+            }, 100);
+        }
+
+        // Hide avatar popup
+        function hideAvatarPopup() {
+            document.getElementById('avatarPopup').classList.remove('show');
+            document.removeEventListener('click', hideAvatarPopup);
+        }
+
+        // Assess avatar mood
+        function assessAvatar(mood) {
+            if (!currentAvatar) return;
+            
+            // Award YRA
+            yraBalance += 3; // Base reward
+            
+            // Check if correct (simplified - in real app would check actual mood)
+            const avatarMood = currentAvatar.classList.contains('positive') ? 'positive' :
+                              currentAvatar.classList.contains('negative') ? 'negative' : 'neutral';
+            
+            if (mood === avatarMood) {
+                yraBalance += 10; // Bonus for correct
+            }
+            
+            assessmentCount++;
+            
+            // Update stats
+            document.getElementById('yraBalance').textContent = yraBalance;
+            document.getElementById('assessments').textContent = assessmentCount;
+            document.getElementById('accuracy').textContent = 
+                Math.round((yraBalance / (assessmentCount * 13)) * 100) + '%';
+            
+            // Remove assessed avatar
+            currentAvatar.style.opacity = '0.3';
+            currentAvatar.style.pointerEvents = 'none';
+            
+            hideAvatarPopup();
+        }
+
+        // Set general mood
+        function setGeneralMood(mood) {
+            // Award YRA for general assessment
+            yraBalance += 5;
+            document.getElementById('yraBalance').textContent = yraBalance;
+            
+            // Visual feedback
+            const buttons = document.querySelectorAll('.mood-btn');
+            buttons.forEach(btn => {
+                btn.style.opacity = '0.5';
+            });
+            
+            setTimeout(() => {
+                buttons.forEach(btn => {
+                    btn.style.opacity = '1';
+                });
+            }, 1000);
+        }
+
+        // Toggle heat map
+        function toggleHeatMap() {
+            const zones = document.querySelectorAll('.mood-zone');
+            zones.forEach(zone => {
+                zone.style.display = zone.style.display === 'none' ? 'block' : 'none';
+            });
+        }
+
+        // Show login (mock)
+        function showLogin() {
+            isLoggedIn = true;
+            document.getElementById('forecastPanel').classList.add('show');
+            alert('Nach dem Login: KI-Prognosen, personalisierte Erfassung und historische Analysen verfügbar!');
+        }
+    </script>
+</body>
+</html>

@@ -1,0 +1,928 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WAMELI - Wie tickt die Welt? Wie tickt dein Partner?</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&display=swap');
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            background: #000000;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        /* Loading Screen with Questions */
+        .intro-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, #000000 0%, #0a0a1f 100%);
+            z-index: 9999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 1s ease;
+        }
+
+        .questions-container {
+            text-align: center;
+            max-width: 900px;
+            padding: 40px;
+        }
+
+        .power-question {
+            font-size: 3.5rem;
+            font-weight: 900;
+            line-height: 1.1;
+            margin-bottom: 40px;
+            opacity: 0;
+            animation: questionFadeIn 1s ease forwards;
+        }
+
+        @keyframes questionFadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .question-1 {
+            background: linear-gradient(135deg, #60a5fa 0%, #34d399 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation-delay: 0.2s;
+        }
+
+        .question-2 {
+            background: linear-gradient(135deg, #f472b6 0%, #fb923c 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation-delay: 0.8s;
+            font-size: 2.8rem;
+            margin-bottom: 30px;
+        }
+
+        .question-3 {
+            background: linear-gradient(135deg, #a78bfa 0%, #60a5fa 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation-delay: 1.4s;
+            font-size: 2.4rem;
+        }
+
+        .sub-questions {
+            margin-top: 40px;
+            opacity: 0;
+            animation: questionFadeIn 1s ease 2s forwards;
+        }
+
+        .sub-question {
+            font-size: 1.4rem;
+            color: #94a3b8;
+            margin: 15px 0;
+            font-weight: 300;
+        }
+
+        .sub-question strong {
+            color: #60a5fa;
+            font-weight: 600;
+        }
+
+        .enter-btn {
+            margin-top: 50px;
+            padding: 18px 50px;
+            background: linear-gradient(135deg, #2563eb, #7c3aed);
+            border: none;
+            border-radius: 50px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            opacity: 0;
+            animation: questionFadeIn 0.8s ease 2.5s forwards;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 40px rgba(37, 99, 235, 0.4);
+        }
+
+        .enter-btn:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 15px 50px rgba(37, 99, 235, 0.6);
+        }
+
+        /* Main App Container */
+        .app-container {
+            display: grid;
+            grid-template-columns: 500px 1fr;
+            height: 100vh;
+            position: relative;
+            opacity: 0;
+            transition: opacity 1s ease;
+        }
+
+        .app-container.show {
+            opacity: 1;
+        }
+
+        /* Left Panel */
+        .control-panel {
+            background: linear-gradient(180deg, rgba(5, 5, 15, 0.98) 0%, rgba(10, 10, 30, 0.98) 100%);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            overflow-y: auto;
+            position: relative;
+            z-index: 100;
+        }
+
+        /* Question Cards */
+        .question-cards {
+            margin-bottom: 30px;
+        }
+
+        .question-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 15px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .question-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(96, 165, 250, 0.3), transparent);
+            transition: left 0.6s ease;
+        }
+
+        .question-card:hover::before {
+            left: 100%;
+        }
+
+        .question-card:hover {
+            background: rgba(96, 165, 250, 0.08);
+            border-color: rgba(96, 165, 250, 0.3);
+            transform: translateX(5px);
+        }
+
+        .question-icon {
+            font-size: 2rem;
+            margin-bottom: 10px;
+        }
+
+        .question-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #f1f5f9;
+            margin-bottom: 8px;
+        }
+
+        .question-answer {
+            font-size: 0.95rem;
+            color: #64748b;
+            line-height: 1.5;
+        }
+
+        .answer-highlight {
+            color: #60a5fa;
+            font-weight: 600;
+        }
+
+        /* Live Answer Display */
+        .live-answer {
+            background: linear-gradient(135deg, rgba(96, 165, 250, 0.1), rgba(52, 211, 153, 0.1));
+            border: 1px solid rgba(96, 165, 250, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .answer-label {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 10px;
+        }
+
+        .answer-value {
+            font-size: 1.8rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #60a5fa, #34d399);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        /* Mood Finder */
+        .mood-finder {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .finder-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: #f1f5f9;
+        }
+
+        .mood-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .mood-tag {
+            padding: 6px 12px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .mood-tag:hover {
+            background: rgba(96, 165, 250, 0.2);
+            border-color: rgba(96, 165, 250, 0.5);
+            transform: scale(1.05);
+        }
+
+        .mood-tag.active {
+            background: rgba(96, 165, 250, 0.3);
+            border-color: #60a5fa;
+            color: #60a5fa;
+        }
+
+        /* Person Ticker */
+        .person-ticker {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .ticker-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .ticker-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+
+        .ticker-selector {
+            display: flex;
+            gap: 5px;
+        }
+
+        .ticker-btn {
+            padding: 5px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 6px;
+            color: #94a3b8;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .ticker-btn.active {
+            background: rgba(96, 165, 250, 0.2);
+            border-color: #60a5fa;
+            color: #60a5fa;
+        }
+
+        .ticker-content {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 5px;
+        }
+
+        .ticker-day {
+            text-align: center;
+            padding: 10px 5px;
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .ticker-day:hover {
+            background: rgba(96, 165, 250, 0.1);
+            transform: scale(1.1);
+        }
+
+        .ticker-day-label {
+            font-size: 0.7rem;
+            color: #64748b;
+            margin-bottom: 5px;
+        }
+
+        .ticker-mood {
+            font-size: 1.5rem;
+        }
+
+        .ticker-time {
+            font-size: 0.65rem;
+            color: #475569;
+            margin-top: 3px;
+        }
+
+        /* Best Mood Locations */
+        .best-locations {
+            background: linear-gradient(135deg, rgba(52, 211, 153, 0.1), rgba(96, 165, 250, 0.1));
+            border: 1px solid rgba(52, 211, 153, 0.3);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .locations-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 15px;
+        }
+
+        .location-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+            margin-bottom: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .location-item:hover {
+            background: rgba(0, 0, 0, 0.4);
+            transform: translateX(5px);
+        }
+
+        .location-name {
+            font-size: 0.9rem;
+            color: #e2e8f0;
+        }
+
+        .location-mood {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+
+        .mood-score {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #34d399;
+        }
+
+        /* Right Side - Globe */
+        .globe-container {
+            position: relative;
+            width: 100%;
+            height: 100vh;
+            background: #000;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Floating Info Cards */
+        .info-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            pointer-events: none;
+            z-index: 10;
+        }
+
+        .info-card {
+            position: absolute;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border: 2px solid;
+            border-radius: 12px;
+            padding: 12px;
+            pointer-events: all;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            min-width: 150px;
+            animation: float 4s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0) scale(1); }
+            50% { transform: translateY(-15px) scale(1.02); }
+        }
+
+        .info-card.best {
+            border-color: #34d399;
+            box-shadow: 0 0 30px rgba(52, 211, 153, 0.5);
+        }
+
+        .info-card.good {
+            border-color: #60a5fa;
+            box-shadow: 0 0 30px rgba(96, 165, 250, 0.5);
+        }
+
+        .info-card.neutral {
+            border-color: #fbbf24;
+            box-shadow: 0 0 30px rgba(251, 191, 36, 0.5);
+        }
+
+        .info-card-header {
+            font-size: 1rem;
+            font-weight: 600;
+            color: #f1f5f9;
+            margin-bottom: 8px;
+        }
+
+        .info-card-detail {
+            font-size: 0.85rem;
+            color: #94a3b8;
+            margin-bottom: 5px;
+        }
+
+        .info-card-mood {
+            font-size: 1.8rem;
+            text-align: center;
+            margin-top: 8px;
+        }
+
+        /* Control Buttons */
+        .control-btns {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+
+        .control-btn {
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            padding: 10px 20px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+        }
+
+        .control-btn:hover {
+            background: rgba(37, 99, 235, 0.2);
+            border-color: rgba(37, 99, 235, 0.5);
+            transform: translateY(-2px);
+        }
+
+        /* Responsive */
+        @media (max-width: 1200px) {
+            .app-container {
+                grid-template-columns: 1fr;
+            }
+
+            .control-panel {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                top: auto;
+                max-height: 50vh;
+                border-right: none;
+                border-top: 1px solid rgba(255, 255, 255, 0.1);
+                border-radius: 20px 20px 0 0;
+            }
+
+            .power-question {
+                font-size: 2.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Intro Screen with Questions -->
+    <div class="intro-screen" id="introScreen">
+        <div class="questions-container">
+            <h1 class="power-question question-1">Wie tickt die Welt?</h1>
+            <h2 class="power-question question-2">Wie tickt dein Partner heute, morgen oder in 14 Tagen?</h2>
+            <h3 class="power-question question-3">Wo herrscht die beste Stimmung?</h3>
+            
+            <div class="sub-questions">
+                <p class="sub-question">Wo kannst du <strong>Menschen nach deinen Vorlieben</strong> begegnen?</p>
+                <p class="sub-question">Wann ist dein <strong>Umfeld am empfänglichsten</strong> für deine Ideen?</p>
+                <p class="sub-question">Wie wird sich die <strong>Stimmung deiner Stadt</strong> entwickeln?</p>
+            </div>
+
+            <button class="enter-btn" onclick="enterApp()">
+                Antworten entdecken →
+            </button>
+        </div>
+    </div>
+
+    <!-- Main App Container -->
+    <div class="app-container" id="appContainer">
+        <!-- Left Control Panel -->
+        <div class="control-panel">
+            <!-- Question Cards with Live Answers -->
+            <div class="question-cards">
+                <div class="question-card" onclick="showAnswer('world')">
+                    <div class="question-icon">🌍</div>
+                    <div class="question-title">Wie tickt die Welt gerade?</div>
+                    <div class="question-answer">
+                        Global dominiert <span class="answer-highlight">vorsichtiger Optimismus</span> mit 
+                        <span class="answer-highlight">62% positiver Stimmung</span> weltweit.
+                    </div>
+                </div>
+
+                <div class="question-card" onclick="showAnswer('partner')">
+                    <div class="question-icon">💑</div>
+                    <div class="question-title">Wie tickt dein Partner?</div>
+                    <div class="question-answer">
+                        Heute: <span class="answer-highlight">Entspannt & aufgeschlossen</span><br>
+                        Morgen: <span class="answer-highlight">Leicht gestresst (Vormittag)</span>
+                    </div>
+                </div>
+
+                <div class="question-card" onclick="showAnswer('location')">
+                    <div class="question-icon">📍</div>
+                    <div class="question-title">Wo herrscht beste Stimmung?</div>
+                    <div class="question-answer">
+                        Aktuell in <span class="answer-highlight">Barcelona (87% positiv)</span> und 
+                        <span class="answer-highlight">Amsterdam (84% positiv)</span>
+                    </div>
+                </div>
+
+                <div class="question-card" onclick="showAnswer('meet')">
+                    <div class="question-icon">🤝</div>
+                    <div class="question-title">Wo triffst du Gleichgesinnte?</div>
+                    <div class="question-answer">
+                        Basierend auf deinem Profil: <span class="answer-highlight">Kreative & Optimisten</span> 
+                        findest du gerade im <span class="answer-highlight">Stadtpark (15:00-18:00)</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Live Answer Display -->
+            <div class="live-answer">
+                <div class="answer-label">Live Stimmung Deutschland</div>
+                <div class="answer-value" id="liveAnswer">68% Positiv ↑</div>
+            </div>
+
+            <!-- Mood Finder -->
+            <div class="mood-finder">
+                <div class="finder-title">🎯 Finde Menschen mit dieser Stimmung:</div>
+                <div class="mood-tags">
+                    <div class="mood-tag" onclick="selectMood(this, 'optimistisch')">😊 Optimistisch</div>
+                    <div class="mood-tag" onclick="selectMood(this, 'kreativ')">🎨 Kreativ</div>
+                    <div class="mood-tag" onclick="selectMood(this, 'motiviert')">💪 Motiviert</div>
+                    <div class="mood-tag" onclick="selectMood(this, 'ruhig')">🧘 Ruhig</div>
+                    <div class="mood-tag" onclick="selectMood(this, 'abenteuerlustig')">🚀 Abenteuerlustig</div>
+                    <div class="mood-tag" onclick="selectMood(this, 'gesellig')">🎉 Gesellig</div>
+                </div>
+                <div style="font-size: 0.85rem; color: #64748b;">
+                    Wähle eine Stimmung → Siehe Orte auf der Karte
+                </div>
+            </div>
+
+            <!-- Person Ticker -->
+            <div class="person-ticker">
+                <div class="ticker-header">
+                    <div class="ticker-title">Stimmungsverlauf</div>
+                    <div class="ticker-selector">
+                        <button class="ticker-btn active" onclick="selectPerson('partner')">Partner</button>
+                        <button class="ticker-btn" onclick="selectPerson('child')">Kind</button>
+                        <button class="ticker-btn" onclick="selectPerson('colleague')">Kollege</button>
+                    </div>
+                </div>
+                <div class="ticker-content">
+                    <div class="ticker-day">
+                        <div class="ticker-day-label">Heute</div>
+                        <div class="ticker-mood">😊</div>
+                        <div class="ticker-time">8-12h</div>
+                    </div>
+                    <div class="ticker-day">
+                        <div class="ticker-day-label">Heute</div>
+                        <div class="ticker-mood">😐</div>
+                        <div class="ticker-time">13-17h</div>
+                    </div>
+                    <div class="ticker-day">
+                        <div class="ticker-day-label">Heute</div>
+                        <div class="ticker-mood">😄</div>
+                        <div class="ticker-time">18-22h</div>
+                    </div>
+                    <div class="ticker-day">
+                        <div class="ticker-day-label">Mo</div>
+                        <div class="ticker-mood">😰</div>
+                        <div class="ticker-time">Vormittag</div>
+                    </div>
+                    <div class="ticker-day">
+                        <div class="ticker-day-label">Di</div>
+                        <div class="ticker-mood">😊</div>
+                        <div class="ticker-time">Ganztags</div>
+                    </div>
+                    <div class="ticker-day">
+                        <div class="ticker-day-label">Mi</div>
+                        <div class="ticker-mood">😌</div>
+                        <div class="ticker-time">Ganztags</div>
+                    </div>
+                    <div class="ticker-day">
+                        <div class="ticker-day-label">+7 Tage</div>
+                        <div class="ticker-mood">😊</div>
+                        <div class="ticker-time">Trend</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Best Mood Locations -->
+            <div class="best-locations">
+                <div class="locations-title">🏆 Top Stimmungs-Orte jetzt</div>
+                <div class="location-item">
+                    <span class="location-name">Barcelona, Spanien</span>
+                    <span class="location-mood">
+                        <span class="mood-score">87%</span>
+                        <span>😄</span>
+                    </span>
+                </div>
+                <div class="location-item">
+                    <span class="location-name">Amsterdam, Niederlande</span>
+                    <span class="location-mood">
+                        <span class="mood-score">84%</span>
+                        <span>😊</span>
+                    </span>
+                </div>
+                <div class="location-item">
+                    <span class="location-name">Kopenhagen, Dänemark</span>
+                    <span class="location-mood">
+                        <span class="mood-score">82%</span>
+                        <span>😊</span>
+                    </span>
+                </div>
+                <div class="location-item">
+                    <span class="location-name">München, Deutschland</span>
+                    <span class="location-mood">
+                        <span class="mood-score">79%</span>
+                        <span>😌</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Globe Container -->
+        <div class="globe-container">
+            <!-- Google Maps -->
+            <div id="map"></div>
+
+            <!-- Info Overlay -->
+            <div class="info-overlay" id="infoOverlay">
+                <!-- Dynamic info cards will be added here -->
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="control-btns">
+                <button class="control-btn" onclick="toggleView()">
+                    🗺️ Ansicht wechseln
+                </button>
+                <a href="https://earth.google.com/web/" target="_blank" class="control-btn">
+                    🌍 3D Earth
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Global variables
+        let map;
+        let markers = [];
+        let currentView = 'mood';
+        let selectedMood = null;
+
+        // Enter app
+        function enterApp() {
+            const intro = document.getElementById('introScreen');
+            const app = document.getElementById('appContainer');
+            
+            intro.style.opacity = '0';
+            setTimeout(() => {
+                intro.style.display = 'none';
+                app.classList.add('show');
+                initMap();
+                updateInfoCards();
+                startLiveUpdates();
+            }, 1000);
+        }
+
+        // Initialize map
+        function initMap() {
+            map = new google.maps.Map(document.getElementById('map'), {
+                center: { lat: 50.9375, lng: 6.9603 },
+                zoom: 5,
+                mapTypeId: 'satellite',
+                disableDefaultUI: true,
+                styles: [
+                    {
+                        featureType: "all",
+                        elementType: "labels",
+                        stylers: [{ visibility: "off" }]
+                    }
+                ]
+            });
+
+            // Add mood markers
+            addMoodMarkers();
+        }
+
+        // Add mood markers
+        function addMoodMarkers() {
+            const locations = [
+                { lat: 41.3851, lng: 2.1734, mood: 'best', name: 'Barcelona', score: 87 },
+                { lat: 52.3676, lng: 4.9041, mood: 'best', name: 'Amsterdam', score: 84 },
+                { lat: 55.6761, lng: 12.5683, mood: 'best', name: 'Kopenhagen', score: 82 },
+                { lat: 48.1351, lng: 11.5820, mood: 'good', name: 'München', score: 79 },
+                { lat: 50.9375, lng: 6.9603, mood: 'good', name: 'Köln', score: 72 },
+                { lat: 52.5200, lng: 13.4050, mood: 'neutral', name: 'Berlin', score: 65 },
+                { lat: 48.8566, lng: 2.3522, mood: 'good', name: 'Paris', score: 75 },
+                { lat: 51.5074, lng: -0.1278, mood: 'neutral', name: 'London', score: 61 }
+            ];
+
+            locations.forEach(loc => {
+                const marker = new google.maps.Marker({
+                    position: { lat: loc.lat, lng: loc.lng },
+                    map: map,
+                    icon: {
+                        path: google.maps.SymbolPath.CIRCLE,
+                        scale: 12,
+                        fillColor: loc.mood === 'best' ? '#34d399' : 
+                                   loc.mood === 'good' ? '#60a5fa' : '#fbbf24',
+                        fillOpacity: 0.8,
+                        strokeColor: '#ffffff',
+                        strokeWeight: 2
+                    },
+                    title: `${loc.name}: ${loc.score}%`
+                });
+
+                markers.push(marker);
+            });
+        }
+
+        // Update info cards
+        function updateInfoCards() {
+            const overlay = document.getElementById('infoOverlay');
+            overlay.innerHTML = '';
+
+            const cards = [
+                {
+                    type: 'best',
+                    header: 'Barcelona',
+                    detail: '87% Positive Stimmung',
+                    mood: '😄',
+                    left: '60%',
+                    top: '40%'
+                },
+                {
+                    type: 'good',
+                    header: 'Amsterdam',
+                    detail: '84% Positive Stimmung',
+                    mood: '😊',
+                    left: '45%',
+                    top: '25%'
+                },
+                {
+                    type: 'neutral',
+                    header: 'Berlin',
+                    detail: '65% Gemischte Stimmung',
+                    mood: '😐',
+                    left: '55%',
+                    top: '30%'
+                },
+                {
+                    type: 'best',
+                    header: 'Kopenhagen',
+                    detail: '82% Positive Stimmung',
+                    mood: '😊',
+                    left: '50%',
+                    top: '20%'
+                }
+            ];
+
+            cards.forEach((card, index) => {
+                const cardEl = document.createElement('div');
+                cardEl.className = `info-card ${card.type}`;
+                cardEl.style.left = card.left;
+                cardEl.style.top = card.top;
+                cardEl.style.animationDelay = `${index * 0.5}s`;
+                cardEl.innerHTML = `
+                    <div class="info-card-header">${card.header}</div>
+                    <div class="info-card-detail">${card.detail}</div>
+                    <div class="info-card-mood">${card.mood}</div>
+                `;
+                overlay.appendChild(cardEl);
+            });
+        }
+
+        // Select mood filter
+        function selectMood(element, mood) {
+            // Toggle active state
+            document.querySelectorAll('.mood-tag').forEach(tag => {
+                tag.classList.remove('active');
+            });
+            
+            if (selectedMood === mood) {
+                selectedMood = null;
+            } else {
+                element.classList.add('active');
+                selectedMood = mood;
+            }
+
+            // Update map markers based on mood
+            filterMarkersByMood();
+        }
+
+        // Filter markers by mood
+        function filterMarkersByMood() {
+            // In real app, this would filter locations by selected mood
+            console.log('Filtering by mood:', selectedMood);
+        }
+
+        // Select person for ticker
+        function selectPerson(person) {
+            document.querySelectorAll('.ticker-btn').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            event.target.classList.add('active');
+            
+            // Update ticker content (in real app, fetch person-specific data)
+            console.log('Selected person:', person);
+        }
+
+        // Show answer detail
+        function showAnswer(type) {
+            // In real app, this would show detailed answer view
+            console.log('Showing answer for:', type);
+        }
+
+        // Toggle map view
+        function toggleView() {
+            currentView = currentView === 'mood' ? 'heat' : 'mood';
+            // Update map visualization
+            console.log('Switched to view:', currentView);
+        }
+
+        // Start live updates
+        function startLiveUpdates() {
+            setInterval(() => {
+                // Update live answer
+                const values = ['68% Positiv ↑', '71% Positiv ↑', '65% Positiv →', '69% Positiv ↑'];
+                const randomValue = values[Math.floor(Math.random() * values.length)];
+                document.getElementById('liveAnswer').textContent = randomValue;
+            }, 5000);
+        }
+    </script>
+
+    <!-- Google Maps API -->
+    <script async defer 
+        src="https://maps.googleapis.com/maps/api/js?key=YOUR_API_KEY&callback=initMap">
+    </script>
+</body>
+</html>

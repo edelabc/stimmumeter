@@ -1,0 +1,124 @@
+# ==========================================
+# Stimmumeter - Produktions .htaccess
+# ==========================================
+# Diese Datei muss im ROOT-Verzeichnis liegen
+# ==========================================
+
+# DirectoryIndex setzen (index.html hat Priorität)
+DirectoryIndex index.html index.php
+
+# HTTPS-Umleitung - Alle HTTP-Requests zu HTTPS umleiten
+# DEAKTIVIERT für Entwicklung - CORS-Probleme mit localhost:5173
+# <IfModule mod_rewrite.c>
+#   RewriteEngine On
+#   RewriteCond %{HTTPS} off
+#   RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# </IfModule>
+
+# React/Vite SPA Routing
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteBase /
+  
+  # API-Aufrufe direkt weiterleiten (nicht umschreiben)
+  RewriteCond %{REQUEST_URI} ^/api/
+  RewriteRule ^api/(.*)$ api/$1 [L]
+  
+  # Frontend-Routing (SPA) - alle anderen Requests zu index.html
+  RewriteCond %{REQUEST_FILENAME} !-f
+  RewriteCond %{REQUEST_FILENAME} !-d
+  RewriteCond %{REQUEST_URI} !^/api/
+  RewriteCond %{REQUEST_URI} !^/assets/
+  RewriteCond %{REQUEST_URI} !^/favicon\.ico$
+  RewriteRule ^(.*)$ index.html [L]
+</IfModule>
+
+# Sicherheit: Schütze Konfigurationsdateien
+<FilesMatch "^(config\.|\.env)">
+    Require all denied
+</FilesMatch>
+
+# PHP-Dateien nur aus api/ Verzeichnis ausführen
+# TEMPORÄR DEAKTIVIERT für CORS-Debugging
+# <FilesMatch "\.php$">
+#     <If "%{REQUEST_URI} !~ m#^/api/#">
+#         Require all denied
+#     </If>
+# </FilesMatch>
+
+# Verzeichnis-Listing deaktivieren
+Options -Indexes
+
+# Gzip Compression
+<IfModule mod_deflate.c>
+  AddOutputFilterByType DEFLATE text/html text/plain text/xml text/css text/javascript application/javascript application/json application/xml
+  AddOutputFilterByType DEFLATE image/svg+xml
+</IfModule>
+
+# Browser Caching
+<IfModule mod_expires.c>
+  ExpiresActive On
+  
+  # Bilder - 1 Jahr
+  ExpiresByType image/jpg "access plus 1 year"
+  ExpiresByType image/jpeg "access plus 1 year"
+  ExpiresByType image/gif "access plus 1 year"
+  ExpiresByType image/png "access plus 1 year"
+  ExpiresByType image/svg+xml "access plus 1 year"
+  ExpiresByType image/webp "access plus 1 year"
+  ExpiresByType image/x-icon "access plus 1 year"
+  
+  # CSS und JavaScript - 1 Monat
+  ExpiresByType text/css "access plus 1 month"
+  ExpiresByType application/javascript "access plus 1 month"
+  ExpiresByType text/javascript "access plus 1 month"
+  
+  # Fonts - 1 Jahr
+  ExpiresByType font/woff "access plus 1 year"
+  ExpiresByType font/woff2 "access plus 1 year"
+  
+  # HTML - keine Caching (immer aktuell)
+  ExpiresByType text/html "access plus 0 seconds"
+  
+  # JSON - keine Caching
+  ExpiresByType application/json "access plus 0 seconds"
+</IfModule>
+
+# Cache-Control Header
+<IfModule mod_headers.c>
+  # Statische Assets - lange Caching-Zeit
+  <FilesMatch "\.(jpg|jpeg|png|gif|svg|webp|ico|woff|woff2|ttf|eot)$">
+    Header set Cache-Control "max-age=31536000, public, immutable"
+  </FilesMatch>
+  
+  # CSS und JavaScript - mittlere Caching-Zeit
+  <FilesMatch "\.(css|js)$">
+    Header set Cache-Control "max-age=2592000, public"
+  </FilesMatch>
+  
+  # HTML - kein Caching
+  <FilesMatch "\.(html|htm)$">
+    Header set Cache-Control "no-cache, no-store, must-revalidate"
+    Header set Pragma "no-cache"
+    Header set Expires "0"
+  </FilesMatch>
+  
+  # Security Headers
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "SAMEORIGIN"
+  Header always set X-XSS-Protection "1; mode=block"
+  Header always set Referrer-Policy "strict-origin-when-cross-origin"
+</IfModule>
+
+# MIME-Types
+<IfModule mod_mime.c>
+  AddType application/javascript .js
+  AddType text/css .css
+  AddType image/svg+xml .svg
+  AddType application/json .json
+  AddType font/woff .woff
+  AddType font/woff2 .woff2
+</IfModule>
+
+
+

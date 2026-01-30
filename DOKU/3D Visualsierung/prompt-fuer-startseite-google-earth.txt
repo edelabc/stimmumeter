@@ -1,0 +1,289 @@
+1️⃣ Präziser Prompt für eine x-beliebige KI
+Diesen Block kannst du 1:1 in eine andere KI kopieren (z. B. als System- oder Projekt-Prompt):
+# Rolle
+Du bist ein Senior Full-Stack- und Geo-Visualisierungs-Entwickler mit Fokus auf:
+- Echtzeit-Datenströme (Events, Timestamps, Geodaten)
+- Aggregation großer Datenmengen (Time-Series, Geohashes, Clustering)
+- 3D-Visualisierung auf einem Globus (Google Maps WebGL / 3D, Google Earth-ähnliche Ansicht)
+- saubere API-Schnittstellen (REST/JSON) zwischen Backend, KI-Schicht und Frontend
+
+---
+
+# Ziel des Projekts
+
+Ich baue ein System, das **Stimmungsdaten der Menschen weltweit** sammelt.  
+Jeder Eintrag hat:
+- einen **Detail-Indikator** (z. B. „ängstlich“, „optimistisch“, „lustlos“ …),
+- einen **numerischen Wert** auf einer Skala von **0–10** (Schrittweite 0,5),
+- einen **Timestamp**,
+- **Geodaten** (Breite/Länge).
+
+Alle Indikatoren sind in einer Liste ähnlich zu:
+- „abschreckend, abstoßend, aktiv, allwissend, angespannt, anziehend, aufmerksam, ausgeglichen, …, zuversichtlich, ängstlich, übermütig“
+mit:
+- **Emoji**, **Name** und einer **Hauptkategorie**:  
+  - `positiv`  
+  - `neutral`  
+  - `negativ`
+
+Aus allen diesen Detail-Einträgen soll eine **Live-Weltkarte** (3D-Globus, Google-Earth-ähnlich) entstehen, die **pro Ort** eine der **3 Hauptstimmungen** zeigt:
+- überwiegend POSITIV
+- überwiegend NEUTRAL / GEMISCHT
+- überwiegend NEGATIV
+
+Ziel:
+1. Aktuelle **Live-Stimmung nach Orten** sichtbar machen (Städte, Regionen, Länder).
+2. Technische Grundlage schaffen, um später **Prognosen** (Vorhersagen) zu ermöglichen.
+
+---
+
+# Vorhandene Datenstruktur (Beispiel)
+
+## Tabelle `mood_indicators`
+Enthält alle globalen Standard-Indikatoren (aus werte_liste.md und werte_liste_erweitert.md):
+
+- `id` (PK)
+- `name` (Text, z. B. "ängstlich")
+- `emoji` (z. B. "😨")
+- `category` (`positiv` | `neutral` | `negativ`)
+- `color` (Hex)
+- `min_value` (0)
+- `max_value` (10)
+- `step_value` (0.5)
+- `user_id` (NULL = global, sonst benutzerdefiniert)
+
+Beispiel:  
+`("ängstlich", "😨", "negativ", "#ef4444", 0, 10, 0.5, NULL)`
+
+## Tabelle `mood_entries`
+Enthält die **konkreten Stimmungs-Einträge** einzelner Nutzer:
+
+- `id` (PK)
+- `user_id` (FK)
+- `indicator_id` (FK auf `mood_indicators.id`)
+- `value` (0–10, Schritt 0.5)
+- `latitude` (float)
+- `longitude` (float)
+- `created_at` (Timestamp mit Zeitzone)
+- optional: `geo_hash` oder `location_id` (Clustering)
+
+---
+
+# Was du als KI tun sollst
+
+## 1. Datenmodell prüfen und ggf. verfeinern
+- Validere, ob oben stehende Tabellen für:
+  - **Aggregation nach Ort und Zeitfenster**
+  - **Schnelle Visualisierung auf einer Karte / 3D-Globus**
+  ausreichend sind.
+- Schlage nur dann neue Felder vor, wenn es wirklich nötig ist (z. B. `geo_bucket`, `country_code`, `city`).
+
+## 2. Aggregationslogik für die 3 Hauptzustände entwerfen
+
+Definiere einen **klaren Algorithmus**, wie aus den Detail-Indikatoren ein **Stimmungsindex pro Ort** entsteht. Beispiel-Vorgabe (du darfst optimieren, aber nicht verfälschen):
+
+1. **Zeitfenster**: z. B. letzte 15 Minuten, 1 Stunde, 24 Stunden (konfigurierbar).
+2. **Räumliche Aggregation**:
+   - entweder per **Geohash** (z. B. Länge 5–7)
+   - oder per **Grid** (z. B. 0.05° × 0.05°)
+3. **Mapping Detail → Score**:
+   - `positiv`  → +1
+   - `neutral`  → 0
+   - `negativ`  → −1
+4. **Gewichtung nach Intensität**:
+   - Normiere `value` von 0–10 auf 0–1  
+     `w = value / 10`
+   - Für einen Eintrag `i`:  
+     `score_i = base_category_score * w`
+5. **Aggregierter Score pro Zelle**:
+   - `mood_score = sum(score_i) / count(entries_in_cell)`
+   - Wertebereich ungefähr **−1 … +1**
+6. **3 Zustände ableiten**:
+   - `mood_score <= -0.2`  → **NEGATIV**
+   - `-0.2 < mood_score < +0.2` → **NEUTRAL / GEMISCHT**
+   - `mood_score >= +0.2` → **POSITIV**
+7. Zusätzlich: Anzahl der Einträge (`intensity`), um schwache vs. starke Signale zu erkennen.
+
+**Lieferables:**
+- SQL-Beispiele (z. B. PostgreSQL + PostGIS oder Supabase) für:
+  - Aggregation nach Zeitfenster
+  - Aggregation nach Geohash / Grid
+- Eine saubere Backend-Funktion/Route, z. B.:
+  - `GET /api/mood/live?time_window=15m&zoom=5`
+  die JSON zurückgibt.
+
+## 3. API-Antwortformat für die Karte / den 3D-Globus definieren
+
+Definiere ein kompaktes JSON-Schema, z. B.:
+
+```json
+{
+  "time_window": "15m",
+  "generated_at": "2025-11-21T12:00:00Z",
+  "cells": [
+    {
+      "lat": 50.94,
+      "lng": 6.96,
+      "mood_score": 0.42,
+      "state": "positive",
+      "count": 128,
+      "top_indicators": [
+        {"name": "optimistisch", "share": 0.32},
+        {"name": "motiviert", "share": 0.21},
+        {"name": "freundlich", "share": 0.19}
+      ]
+    },
+    {
+      "lat": 52.52,
+      "lng": 13.40,
+      "mood_score": -0.35,
+      "state": "negative",
+      "count": 90,
+      "top_indicators": [
+        {"name": "ängstlich", "share": 0.28},
+        {"name": "angespannt", "share": 0.24},
+        {"name": "depressiv", "share": 0.17}
+      ]
+    }
+  ]
+}
+Bitte:
+klar zwischen Backend-API (liefert JSON)
+und Visualisierung (nutzt dieses JSON) unterscheiden.
+4. Google-Earth-/3D-Visualisierung entwerfen
+Erzeuge eine technische Beschreibung und Code-Beispiele für eine Web-App, die:
+mit Google Maps JavaScript API (WebGL, Vector Maps) arbeitet,
+den Globus mit:
+Tilt & Rotation (Kamera frei drehbar, Google-Earth-Feeling),
+3D-Ansicht (WebGL Overlays) rendert,
+pro cell aus dem JSON eine Darstellung zeigt, z. B.:
+farbcodierte Kreise, Säulen oder Heatmap-Kacheln,
+Farbe nach state (positive/neutral/negative),
+Höhe/Größe nach count oder |mood_score|.
+Erwartet wird:
+Beispiel-HTML + JavaScript (oder TypeScript) mit:
+Einbindung der Maps-JS-API mit renderingType: VECTOR und aktivierten Tilt/Rotation
+map.moveCamera() bzw. setTilt() / setHeading() zur 3D-Steuerung
+Verwendung von WebGLOverlayView oder einem einfachen Layer, um Mood-Marker zu zeichnen
+Vorschlag für Farbschema:
+negative: von grün → gelb → rot (je negativer, desto roter)
+positive: von rot → gelb → grün (je positiver, desto grüner)
+neutral: Grau/Blau-Töne
+5. „Live“-Update-Mechanismus beschreiben
+Zeige, wie die Karte automatisch aktualisiert werden kann:
+per Polling: z. B. alle 30–60 Sekunden GET /api/mood/live
+oder per WebSocket / SSE (optional).
+Anforderungen:
+Frontend aktualisiert nur die betroffenen Zellen, nicht die gesamte Karte.
+Füge eine logische Zeitleiste / Slider hinzu:
+z. B. „Letzte 15 Min / 1h / 24h / 7 Tage“
+Beim Wechsel des Zeitfensters neue Daten vom Backend holen.
+6. Dokumentation & Erklärbarkeit
+Erstelle am Ende:
+eine kurze, gut verständliche Dokumentation, die erklärt:
+wie aus Detail-Indikatoren → 3 Hauptzustände werden,
+welche Grenzen/Schwellenwerte verwendet werden,
+wie das System bei geringer Datenmenge (wenige Einträge) reagiert.
+Hinweise zu Bias & Repräsentativität:
+Nicht alle Regionen senden gleich viele Daten.
+Wie kann man das visuell kennzeichnen (z. B. Transparenz, „Data Density“)?
+7. Form deines Outputs
+Gib:
+Konzept / Architektur (Text + Skizzenidee),
+Beispiel-API-Specs (Endpoints, JSON),
+konkrete Code-Snippets (SQL, Backend, JS für Map),
+eine kurze Checkliste, wie man das System deployen kann.
+Nutze klare Überschriften und Code-Blöcke, damit ich es direkt in mein Projekt übernehmen kann.
+
+---
+
+## 2️⃣ Google-Earth-/Google-Maps-3D-Integration – Schritt für Schritt
+
+Hier jetzt **nicht als Prompt**, sondern als Anleitung für dich (damit du weißt, was du der KI abverlangen kannst).
+
+### Schritt 1: Google Cloud & API-Key
+
+1. Google Cloud Projekt anlegen oder auswählen.
+2. **Maps JavaScript API** aktivieren. :contentReference[oaicite:0]{index=0}  
+3. API-Key erstellen und **HTTP-Referer-Restriktion** setzen (deine Domain / localhost).
+
+### Schritt 2: 3D/ WebGL aktivieren
+
+In der Maps JS API brauchst du:
+- **Vector Map Rendering** und
+- **Tilt & Rotation** aktiviert. :contentReference[oaicite:1]{index=1}  
+
+Wichtig:
+- `renderingType: RenderingType.VECTOR` oder ein Map ID mit Vector + Tilt/Rotation.
+- Für volle 3D-Kontrolle ggf. `tiltInteractionEnabled` und `headingInteractionEnabled`.
+
+### Schritt 3: Grundgerüst der Karte
+
+Ein simples HTML-Skeleton:
+
+```html
+<div id="map" style="width:100vw; height:100vh;"></div>
+<script
+  src="https://maps.googleapis.com/maps/api/js?key=DEIN_API_KEY&libraries=maps"
+  async defer></script>
+<script>
+  let map;
+
+  async function initMap() {
+    const { Map, RenderingType } = await google.maps.importLibrary("maps");
+
+    map = new Map(document.getElementById("map"), {
+      center: { lat: 0, lng: 0 },
+      zoom: 2,
+      renderingType: RenderingType.VECTOR,
+      tilt: 45,
+      heading: 0,
+    });
+
+    // Hier später: Mood-Overlays / WebGLOverlayView
+  }
+
+  initMap();
+</script>
+Damit bekommst du bereits eine dreh- und kippbare 3D-Map (Google-Earth-Gefühl).
+Schritt 4: Mood-Daten als Overlay darstellen
+Variante A (einfach):
+Pro cell einen Circle / Marker mit Farbe nach state (pos/neu/neg).
+Variante B (fortgeschritten):
+Mit WebGLOverlayView 3D-Säulen / Flächen rendern (z. B. Höhe = Anzahl Einträge). 
+Google for Developers
++2
+Google for Developers
++2
+Die KI kann dir hier:
+ein kleines Three.js-Beispiel generieren, das über WebGLOverlayView 3D-Objekte auf die Karte legt,
+Koordinaten zu lat/lng mappen.
+Schritt 5: Live-Verbindung zur Stimmungs-API
+Frontend-Logik:
+Zeitfenster wählen (Dropdown/Slider).
+Request an dein Backend:
+GET /api/mood/live?time_window=15m&zoom=4
+Antwort-JSON verarbeiten, pro Zelle:
+Position (lat/lng)
+state (positive/neutral/negative)
+mood_score
+count
+Overlay aktualisieren (Farbe, Größe, ggf. Tooltip mit Top-Indikatoren).
+Wiederholung:
+alle X Sekunden neu laden oder WebSocket-Events verarbeiten.
+3️⃣ Wie die KI „ständig“ aus den Einträgen ein Live-Bild erzeugt
+Gedanklich brauchst du drei Ebenen:
+Rohdaten: einzelne Mood-Einträge (User → Indikator → Wert → Zeit → Ort).
+Aggregations-Engine (SQL, Backend oder KI-Assistenz):
+Aggregiert z. B. alle 30 Sekunden
+Nach Raster / Geohash + Zeitfenster
+Berechnet mood_score, state, count
+Visualisierung:
+Fragt nur die fertigen aggregierten Cells ab
+Zeichnet sie auf der 3D-Map
+Was die KI tun kann:
+Dir optimierte SQL-Queries bauen, die das Aggregieren schnell machen.
+Die Kategorisierung (positiv/neutral/negativ) feinjustieren.
+Die Farbrampen und Legende so gestalten, dass man auf einen Blick:
+sieht, wo die Stimmung kippt,
+erkennt, wo wenig Daten vorhanden sind.
