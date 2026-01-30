@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { CheckCircle2, ArrowRight, Loader } from 'lucide-react';
 import { handlePaymentSuccess } from '../lib/stripe-service';
-import { supabase } from '../lib/supabase';
+import { getCurrentUser } from '../lib/auth-mysql';
 
 export function PaymentSuccess() {
   const [processing, setProcessing] = useState(true);
@@ -25,7 +25,7 @@ export function PaymentSuccess() {
         return;
       }
 
-      const { data: { user } } = await supabase.auth.getUser();
+      const user = await getCurrentUser();
 
       if (!user) {
         setError('Benutzer nicht authentifiziert');

@@ -1,9 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
-  CreditCard,
   FileText,
   TrendingUp,
-  Check,
   AlertCircle,
   Download,
   Calendar,
@@ -13,13 +11,8 @@ import {
   getUserSubscription,
   getUserInvoices,
   getUserUsageRecords,
-  getActivePricingPlans,
-  type UserSubscription,
-  type Invoice,
-  type UsageRecord,
-  type PricingPlan,
 } from '../lib/billing';
-import { supabase } from '../lib/supabase';
+import { getCurrentUser } from '../lib/auth-mysql';
 
 export function UserBillingPortal() {
   const [activeTab, setActiveTab] = useState<'overview' | 'invoices' | 'usage'>('overview');
@@ -34,7 +27,7 @@ export function UserBillingPortal() {
 
   const loadUserBillingData = async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) {
       setLoading(false);
       return;
@@ -70,31 +63,28 @@ export function UserBillingPortal() {
         <nav className="-mb-px flex gap-8">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'overview'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'overview'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
           >
             Übersicht
           </button>
           <button
             onClick={() => setActiveTab('invoices')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'invoices'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'invoices'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
           >
             Rechnungen
           </button>
           <button
             onClick={() => setActiveTab('usage')}
-            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'usage'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
+            className={`py-4 px-1 border-b-2 font-medium text-sm transition-colors ${activeTab === 'usage'
+              ? 'border-blue-500 text-blue-600'
+              : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
           >
             Nutzung
           </button>
@@ -152,9 +142,8 @@ function SubscriptionOverview({ subscription }: { subscription: any }) {
                   {plan?.name || 'Unknown Plan'}
                 </h3>
                 <span
-                  className={`text-xs px-3 py-1 rounded-full font-medium ${
-                    statusColors[subscription.status as keyof typeof statusColors]
-                  }`}
+                  className={`text-xs px-3 py-1 rounded-full font-medium ${statusColors[subscription.status as keyof typeof statusColors]
+                    }`}
                 >
                   {subscription.status.toUpperCase()}
                 </span>
@@ -306,9 +295,8 @@ function InvoicesList({ invoices }: { invoices: any[] }) {
               </td>
               <td className="px-6 py-4">
                 <span
-                  className={`text-xs px-2 py-1 rounded-full font-medium ${
-                    statusColors[invoice.status as keyof typeof statusColors]
-                  }`}
+                  className={`text-xs px-2 py-1 rounded-full font-medium ${statusColors[invoice.status as keyof typeof statusColors]
+                    }`}
                 >
                   {invoice.status}
                 </span>
@@ -344,7 +332,7 @@ function UsageOverview({ usageRecords }: { usageRecords: any[] }) {
     return acc;
   }, {} as Record<string, { name: string; icon: string; count: number }>);
 
-  const usageSummary = Object.values(groupedUsage);
+  const usageSummary: Array<{ name: string; icon: string; count: number }> = Object.values(groupedUsage);
 
   if (usageSummary.length === 0) {
     return (
@@ -367,7 +355,7 @@ function UsageOverview({ usageRecords }: { usageRecords: any[] }) {
           Usage Summary (Last 30 Days)
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {usageSummary.map(item => (
+          {usageSummary.map((item: { name: string; icon: string; count: number }) => (
             <div
               key={item.name}
               className="bg-gray-50 border border-gray-200 rounded-lg p-4"

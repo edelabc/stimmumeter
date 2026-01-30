@@ -117,3 +117,4 @@ COMMENT ON COLUMN t_vereinbarungen.slug IS 'URL-friendly identifier for agreemen
 
 
 
+

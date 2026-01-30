@@ -2,14 +2,8 @@ import { useState, useEffect } from 'react';
 import { Save, Plus, Trash2 } from 'lucide-react';
 import { getFooterSettings, updateFooterSettings, FooterContent } from '../../lib/menu.service';
 
-interface FooterLink {
-  title: string;
-  url: string;
-}
-
 export function FooterManagement() {
   const [loading, setLoading] = useState(true);
-  const [footerId, setFooterId] = useState<string | null>(null);
   const [content, setContent] = useState<FooterContent>({
     text: '© 2025 Stimmungs-Tracker. Alle Rechte vorbehalten.',
     links: []
@@ -23,9 +17,12 @@ export function FooterManagement() {
   const loadFooterSettings = async () => {
     try {
       const settings = await getFooterSettings();
-      setFooterId(settings.id);
       if (settings.content) {
-        setContent(settings.content);
+        // Stelle sicher, dass links immer ein Array ist
+        setContent({
+          text: settings.content.text || '© 2025 Stimmungs-Tracker. Alle Rechte vorbehalten.',
+          links: settings.content.links || []
+        });
       }
     } catch (error) {
       console.error('Fehler beim Laden der Footer-Einstellungen:', error);
@@ -34,6 +31,7 @@ export function FooterManagement() {
       setLoading(false);
     }
   };
+
 
   const handleSave = async () => {
     try {
@@ -118,7 +116,7 @@ export function FooterManagement() {
             </button>
           </div>
 
-          {content.links.length > 0 && (
+          {(content.links?.length || 0) > 0 && (
             <div className="space-y-2">
               {content.links.map((link, index) => (
                 <div

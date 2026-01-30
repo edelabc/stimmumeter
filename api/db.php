@@ -110,64 +110,90 @@ try {
         return $pdo;
     }
     
-    // Auto-Setup: Prüfe fehlende Tabellen und Schema-Änderungen
-    require_once __DIR__ . '/auto-setup.php';
-    $autoSetup = new AutoSetup($pdo);
+    // PERFORMANCE-OPTIMIERUNG: Schema-Check nur einmal täglich ausführen
+    // Anstatt bei jedem Request kostspielige Schema-Migrationen durchzuführen
+    $schemaCheckFile = __DIR__ . '/../.schema-check-cache';
+    $schemaCheckInterval = 86400; // 24 Stunden in Sekunden
+    $runSchemaCheck = false;
     
-    // Prüfe ob wichtige Tabellen fehlen
-    $criticalTables = ['session_yra', 'mood_assessments'];
-    $missingTables = [];
-    
-    foreach ($criticalTables as $table) {
-        $check = $pdo->query("SHOW TABLES LIKE '$table'")->fetch();
-        if (!$check) {
-            $missingTables[] = $table;
+    if (!file_exists($schemaCheckFile)) {
+        $runSchemaCheck = true;
+    } else {
+        $lastCheck = (int)file_get_contents($schemaCheckFile);
+        if (time() - $lastCheck > $schemaCheckInterval) {
+            $runSchemaCheck = true;
         }
     }
     
-    // Wenn Tabellen fehlen: Backup erstellen und Tabellen erstellen
-    if (!empty($missingTables)) {
-        error_log("⚠️ Fehlende Tabellen erkannt: " . implode(', ', $missingTables));
+    // Erzwinge Schema-Check über URL-Parameter (für Entwicklung/Debugging)
+    if (isset($_GET['force_schema_check']) && $_GET['force_schema_check'] === '1') {
+        $runSchemaCheck = true;
+    }
+    
+    if ($runSchemaCheck) {
+        // Auto-Setup: Prüfe fehlende Tabellen und Schema-Änderungen
+        require_once __DIR__ . '/auto-setup.php';
+        $autoSetup = new AutoSetup($pdo);
         
-        // Backup erstellen (falls Datenbank nicht leer ist)
-        $allTables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
-        if (!empty($allTables)) {
-            $autoSetup->createBackupIfNeeded();
-        }
+        // Prüfe ob wichtige Tabellen fehlen
+        $criticalTables = ['session_yra', 'mood_assessments'];
+        $missingTables = [];
         
-        // Fehlende Tabellen erstellen (führt auch Schema-Migration aus)
-        $result = $autoSetup->createMissingTables();
-        if (!empty($result['created'])) {
-            error_log("✅ Automatisch erstellte Tabellen: " . implode(', ', $result['created']));
-        }
-        
-        // Standard-Daten einfügen
-        $autoSetup->insertDefaultData();
-    } else {
-        // Tabellen existieren - prüfe Schema-Änderungen
-        require_once __DIR__ . '/schema-migrator.php';
-        $migrator = new SchemaMigrator($pdo);
-        
-        error_log("🔄 Prüfe Schema-Änderungen...");
-        $migrationResults = $migrator->migrateAllTables();
-        
-        if (!empty($migrationResults['added'])) {
-            error_log("✅ Neue Spalten hinzugefügt: " . implode(', ', $migrationResults['added']));
-        }
-        
-        if (!empty($migrationResults['modified'])) {
-            error_log("✅ Spalten geändert: " . implode(', ', $migrationResults['modified']));
-        }
-        
-        if (!empty($migrationResults['dropped'])) {
-            error_log("⚠️ Spalten gelöscht: " . implode(', ', $migrationResults['dropped']));
-        }
-        
-        if (!empty($migrationResults['errors'])) {
-            foreach ($migrationResults['errors'] as $error) {
-                error_log("❌ Migrations-Fehler: $error");
+        foreach ($criticalTables as $table) {
+            $check = $pdo->query("SHOW TABLES LIKE '$table'")->fetch();
+            if (!$check) {
+                $missingTables[] = $table;
             }
         }
+        
+        // Wenn Tabellen fehlen: Backup erstellen und Tabellen erstellen
+        if (!empty($missingTables)) {
+            error_log("⚠️ Fehlende Tabellen erkannt: " . implode(', ', $missingTables));
+            
+            // Backup erstellen (falls Datenbank nicht leer ist)
+            $allTables = $pdo->query("SHOW TABLES")->fetchAll(PDO::FETCH_COLUMN);
+            if (!empty($allTables)) {
+                $autoSetup->createBackupIfNeeded();
+            }
+            
+            // Fehlende Tabellen erstellen (führt auch Schema-Migration aus)
+            $result = $autoSetup->createMissingTables();
+            if (!empty($result['created'])) {
+                error_log("✅ Automatisch erstellte Tabellen: " . implode(', ', $result['created']));
+            }
+            
+            // Standard-Daten einfügen
+            $autoSetup->insertDefaultData();
+        } else {
+            // Tabellen existieren - prüfe Schema-Änderungen
+            require_once __DIR__ . '/schema-migrator.php';
+            $migrator = new SchemaMigrator($pdo);
+            
+            error_log("🔄 Prüfe Schema-Änderungen...");
+            $migrationResults = $migrator->migrateAllTables();
+            
+            if (!empty($migrationResults['added'])) {
+                error_log("✅ Neue Spalten hinzugefügt: " . implode(', ', $migrationResults['added']));
+            }
+            
+            if (!empty($migrationResults['modified'])) {
+                error_log("✅ Spalten geändert: " . implode(', ', $migrationResults['modified']));
+            }
+            
+            if (!empty($migrationResults['dropped'])) {
+                error_log("⚠️ Spalten gelöscht: " . implode(', ', $migrationResults['dropped']));
+            }
+            
+            if (!empty($migrationResults['errors'])) {
+                foreach ($migrationResults['errors'] as $error) {
+                    error_log("❌ Migrations-Fehler: $error");
+                }
+            }
+        }
+        
+        // Cache-Datei aktualisieren
+        @file_put_contents($schemaCheckFile, time());
+        error_log("✅ Schema-Check abgeschlossen, nächster Check in 24 Stunden");
     }
     
 } catch (PDOException $e) {

@@ -23,3 +23,4 @@ SELECT '✅ Tabelle session_yra erfolgreich erstellt!' AS Status;
 
 
 
+

@@ -90,3 +90,4 @@ COMMENT ON TABLE user_agreement_consents IS 'Stores user consent for legal agree
 
 
 
+

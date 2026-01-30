@@ -9,44 +9,51 @@ import { ApiError, ErrorCode } from './errors';
  * Kann auch von anderen Modulen verwendet werden
  */
 export const getApiBaseUrl = (): string => {
-  // 1. Prüfe Umgebungsvariable (hat Priorität)
-  const envUrl = import.meta.env.VITE_API_BASE_URL;
-  if (envUrl) {
-    return envUrl;
-  }
-  
-  // 2. Dynamisch basierend auf aktueller Domain erstellen (KEIN localhost-Fallback)
-  if (typeof window !== 'undefined') {
-    const { protocol, hostname, pathname } = window.location;
-    
-    // Bestimme Basis-Pfad
-    let basePath = '';
-    
-    // Wenn wir in einem Unterverzeichnis sind (z.B. /stimmumeter/dist/)
-    if (pathname.includes('/stimmumeter/')) {
-      basePath = '/stimmumeter';
-    } else if (pathname.includes('/dist/')) {
-      // Wenn wir direkt in dist/ sind, entferne /dist und behalte den Rest
-      basePath = pathname.replace(/\/dist.*$/, '').replace(/\/$/, '') || '';
-    } else if (pathname.startsWith('/api')) {
-      // Wenn wir bereits in /api sind, verwende Root
-      basePath = '';
-    } else if (pathname !== '/' && pathname !== '') {
-      // Andere Pfade: entferne den letzten Teil (z.B. /app -> /)
-      const parts = pathname.split('/').filter(p => p);
-      if (parts.length > 0) {
-        // Nimm den ersten Teil als Basis (z.B. /stimmumeter)
-        basePath = '/' + parts[0];
-      }
+    // 1. Prüfe Umgebungsvariable (hat Priorität)
+    const envUrl = import.meta.env.VITE_API_BASE_URL;
+    if (envUrl) {
+        return envUrl;
     }
-    
-    // Baue API-URL zusammen - IMMER die aktuelle Domain verwenden
-    const apiPath = basePath ? `${basePath}/api` : '/api';
-    return `${protocol}//${hostname}${apiPath}`;
-  }
-  
-  // Fallback für SSR oder wenn window nicht verfügbar ist
-  return '/api';
+
+    // 2. Dynamisch basierend auf aktueller Domain erstellen
+    if (typeof window !== 'undefined') {
+        const { protocol, hostname, port, pathname } = window.location;
+
+        // ENTWICKLUNG: Wenn wir auf einem Vite Dev-Server laufen (Port 5173 oder ähnlich),
+        // verwende einen RELATIVEN Pfad, damit der Vite-Proxy die Anfragen abfangen kann
+        if (port && (port === '5173' || port === '5174' || port === '3000')) {
+            // Relativer Pfad für Vite-Proxy
+            return '/stimmumeter/api';
+        }
+
+        // PRODUKTION: Bestimme Basis-Pfad
+        let basePath = '';
+
+        // Wenn wir in einem Unterverzeichnis sind (z.B. /stimmumeter/dist/)
+        if (pathname.includes('/stimmumeter/')) {
+            basePath = '/stimmumeter';
+        } else if (pathname.includes('/dist/')) {
+            // Wenn wir direkt in dist/ sind, entferne /dist und behalte den Rest
+            basePath = pathname.replace(/\/dist.*$/, '').replace(/\/$/, '') || '';
+        } else if (pathname.startsWith('/api')) {
+            // Wenn wir bereits in /api sind, verwende Root
+            basePath = '';
+        } else if (pathname !== '/' && pathname !== '') {
+            // Andere Pfade: entferne den letzten Teil (z.B. /app -> /)
+            const parts = pathname.split('/').filter(p => p);
+            if (parts.length > 0) {
+                // Nimm den ersten Teil als Basis (z.B. /stimmumeter)
+                basePath = '/' + parts[0];
+            }
+        }
+
+        // Baue API-URL zusammen - IMMER die aktuelle Domain verwenden
+        const apiPath = basePath ? `${basePath}/api` : '/api';
+        return `${protocol}//${hostname}${apiPath}`;
+    }
+
+    // Fallback für SSR oder wenn window nicht verfügbar ist
+    return '/api';
 };
 
 export interface ApiResponse<T = any> {
@@ -62,7 +69,7 @@ class ApiClient {
         options: RequestInit = {}
     ): Promise<ApiResponse<T>> {
         const apiBaseUrl = getApiBaseUrl();
-        
+
         // Hole Auth-Token für Authorization Header
         const authHeaders: Record<string, string> = {};
         try {
@@ -76,7 +83,7 @@ class ApiClient {
                 authHeaders['Authorization'] = `Bearer ${token}`;
             }
         }
-        
+
         try {
             const response = await fetch(`${apiBaseUrl}${endpoint}`, {
                 ...options,
@@ -91,7 +98,7 @@ class ApiClient {
             let data: any;
             const contentType = response.headers.get('content-type');
             const responseText = await response.text();
-            
+
             // Prüfe ob Response leer ist
             if (!responseText || responseText.trim() === '') {
                 throw new ApiError(
@@ -100,17 +107,17 @@ class ApiClient {
                     { status: response.status, endpoint }
                 );
             }
-            
+
             // Versuche JSON zu parsen - entferne mögliche zusätzliche Zeichen nach dem JSON
             try {
                 // Finde das erste gültige JSON-Objekt (kann mehrere geben, wenn PHP-Fehler ausgegeben wurden)
                 let jsonText = responseText.trim();
-                
+
                 // Wenn der Text mit { beginnt, versuche das erste JSON-Objekt zu extrahieren
                 if (jsonText.startsWith('{')) {
                     let braceCount = 0;
                     let jsonEnd = -1;
-                    
+
                     for (let i = 0; i < jsonText.length; i++) {
                         if (jsonText[i] === '{') braceCount++;
                         if (jsonText[i] === '}') braceCount--;
@@ -119,12 +126,12 @@ class ApiClient {
                             break;
                         }
                     }
-                    
+
                     if (jsonEnd > 0) {
                         jsonText = jsonText.substring(0, jsonEnd);
                     }
                 }
-                
+
                 data = JSON.parse(jsonText);
             } catch (parseError: any) {
                 // Wenn JSON-Parsing fehlschlägt, versuche den ersten JSON-Teil zu extrahieren
@@ -134,7 +141,7 @@ class ApiClient {
                     if (firstBrace >= 0) {
                         let braceCount = 0;
                         let jsonEnd = -1;
-                        
+
                         for (let i = firstBrace; i < responseText.length; i++) {
                             if (responseText[i] === '{') braceCount++;
                             if (responseText[i] === '}') braceCount--;
@@ -143,7 +150,7 @@ class ApiClient {
                                 break;
                             }
                         }
-                        
+
                         if (jsonEnd > firstBrace) {
                             const jsonText = responseText.substring(firstBrace, jsonEnd);
                             data = JSON.parse(jsonText);
@@ -157,11 +164,11 @@ class ApiClient {
                     throw new ApiError(
                         ErrorCode.API_INVALID_RESPONSE,
                         `Ungültige JSON-Antwort: ${parseError.message}`,
-                        { 
-                            status: response.status, 
-                            responseText: responseText.substring(0, 500), 
+                        {
+                            status: response.status,
+                            responseText: responseText.substring(0, 500),
                             endpoint,
-                            contentType 
+                            contentType
                         }
                     );
                 }
@@ -171,7 +178,7 @@ class ApiClient {
                 // Eindeutige Fehlermeldung basierend auf Status-Code und API-Response
                 const errorMessage = data.error || `HTTP ${response.status}`;
                 const errorCode = data.code || ErrorCode.API_REQUEST_FAILED;
-                
+
                 throw new ApiError(
                     errorCode as ErrorCode,
                     errorMessage,
@@ -191,7 +198,7 @@ class ApiClient {
             if (error instanceof ApiError || error instanceof Error && error.name === 'AppError') {
                 throw error;
             }
-            
+
             // Network-Fehler
             if (error instanceof TypeError && error.message.includes('fetch')) {
                 throw new ApiError(
@@ -200,7 +207,7 @@ class ApiClient {
                     { endpoint, originalError: error.message }
                 );
             }
-            
+
             // JSON-Parsing-Fehler speziell behandeln
             if (error instanceof SyntaxError && error.message.includes('JSON')) {
                 throw new ApiError(
@@ -209,7 +216,7 @@ class ApiClient {
                     { endpoint, originalError: error.message }
                 );
             }
-            
+
             // Unbekannter Fehler
             throw new ApiError(
                 ErrorCode.API_REQUEST_FAILED,

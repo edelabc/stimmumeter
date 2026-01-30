@@ -19,7 +19,7 @@ interface HeaderProps {
 
 export function Header({ onNavigate }: HeaderProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [menuItems, setMenuItems] = useState<MenuItem[] | null>(null);
   const [siteName, setSiteName] = useState('Stimmungs-Tracker');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -35,7 +35,7 @@ export function Header({ onNavigate }: HeaderProps) {
     };
 
     window.addEventListener('storage', handleStorageChange);
-    
+
     // Also check periodically for auth changes
     const interval = setInterval(() => {
       checkAuthStatus();
@@ -63,7 +63,7 @@ export function Header({ onNavigate }: HeaderProps) {
       const headers: HeadersInit = {
         'Content-Type': 'application/json',
       };
-      
+
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
@@ -78,14 +78,14 @@ export function Header({ onNavigate }: HeaderProps) {
       }
 
       const result = await response.json();
-      
+
       if (result.data) {
         setMenuItems(result.data);
       }
     } catch (error) {
       console.warn('Fehler beim Laden der Menu-Items:', error);
-      // Fallback: Setze leeres Array bei Fehler
-      setMenuItems([]);
+      // Bei Fehler: Behalte Fallback-Menü (null-Zustand)
+      // setMenuItems bleibt null, damit Fallback-Items angezeigt werden
     }
   };
 
@@ -103,7 +103,7 @@ export function Header({ onNavigate }: HeaderProps) {
       }
 
       const result = await response.json();
-      
+
       if (result.data?.site_name) {
         setSiteName(result.data.site_name);
       }
@@ -140,7 +140,7 @@ export function Header({ onNavigate }: HeaderProps) {
           </button>
 
           <nav className="flex items-center space-x-8">
-            {menuItems.length > 0 ? (
+            {menuItems !== null && menuItems.length > 0 ? (
               <>
                 {menuItems
                   .filter((item) => isLoggedIn ? item.title !== 'Impressum' : true)
@@ -200,7 +200,7 @@ export function Header({ onNavigate }: HeaderProps) {
       {isMenuOpen && (
         <div className="md:hidden bg-white border-t border-gray-100 shadow-lg">
           <nav className="container mx-auto px-4 py-4 space-y-2">
-            {menuItems.length > 0 ? (
+            {menuItems !== null && menuItems.length > 0 ? (
               <>
                 {menuItems
                   .filter((item) => isLoggedIn ? item.title !== 'Impressum' : true)

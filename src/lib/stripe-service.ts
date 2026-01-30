@@ -1,4 +1,11 @@
-import { supabase } from './supabase';
+/**
+ * Stripe Service
+ * Handhabt Stripe-Zahlungen via lokale PHP-API
+ * Komplett unabhängig von Supabase
+ */
+
+import { getApiBaseUrl } from './api-client';
+import { getAuthHeaders } from './auth-mysql';
 import { createAccountTransaction, getUserAccountConfig, upsertUserAccountConfig } from './billing';
 
 export interface CreateCheckoutSessionParams {
@@ -24,39 +31,12 @@ export async function createPrepaidCheckoutSession(params: CreateCheckoutSession
     throw new Error('Betrag zu hoch (max. 10.000 EUR)');
   }
 
-  if (!supabase) {
-    throw new Error('Supabase ist nicht konfiguriert');
-  }
-
   try {
-    // Get current session
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      throw new Error('Nicht angemeldet');
-    }
-
-    // Call Edge Function to create checkout session
-    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-checkout-session`;
-
-    console.log('🔵 [STRIPE DEBUG] Creating checkout session...');
-    console.log('🔵 [REQUEST] URL:', apiUrl);
-    console.log('🔵 [REQUEST] Method: POST');
-    console.log('🔵 [REQUEST] Headers:', {
-      'Authorization': `Bearer ${session.access_token.substring(0, 20)}...`,
-      'Content-Type': 'application/json',
-    });
-    console.log('🔵 [REQUEST] Body:', JSON.stringify({
-      amount,
-      currency,
-      description,
-      appUrl: finalAppUrl,
-    }, null, 2));
-
-    const response = await fetch(apiUrl, {
+    // Call local PHP API to create checkout session
+    const response = await fetch(`${getApiBaseUrl()}/stripe-checkout.php?action=create-checkout-session`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.access_token}`,
+        ...getAuthHeaders(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -67,65 +47,25 @@ export async function createPrepaidCheckoutSession(params: CreateCheckoutSession
       }),
     });
 
-    console.log('🟢 [RESPONSE] Status:', response.status, response.statusText);
-    console.log('🟢 [RESPONSE] Headers:', Object.fromEntries(response.headers.entries()));
-
-    const responseText = await response.text();
-    console.log('🟢 [RESPONSE] Body (raw):', responseText);
-
-    let data;
-    try {
-      data = JSON.parse(responseText);
-      console.log('🟢 [RESPONSE] Body (parsed):', JSON.stringify(data, null, 2));
-    } catch (parseError) {
-      console.error('🔴 [ERROR] Failed to parse response:', parseError);
-      console.error('🔴 [ERROR] Raw response text:', responseText);
-      throw new Error(
-        'Fehler beim Parsen der Server-Antwort.\n\n' +
-        'Mögliche Ursachen:\n' +
-        '- Edge Function nicht deployed\n' +
-        '- Ungültige Stripe-Keys\n' +
-        '- Server-Fehler\n\n' +
-        'Bitte prüfen Sie die Edge Function Logs im Supabase Dashboard.'
-      );
-    }
+    const data = await response.json();
 
     if (!response.ok || !data.success) {
       const errorMessage = data.error || `HTTP ${response.status}: ${response.statusText}`;
-      console.error('🔴 [ERROR] Edge Function error:', errorMessage);
-      console.error('🔴 [ERROR] Full response data:', data);
+      console.error('Checkout session creation error:', errorMessage);
       throw new Error(errorMessage);
     }
 
-    console.log('🟢 [SUCCESS] Checkout session created!');
-    console.log('🟢 [SUCCESS] Session ID:', data.sessionId);
-    console.log('🟢 [SUCCESS] Checkout URL:', data.url);
-
     // Redirect to Stripe Checkout
     if (!data.url) {
-      console.error('🔴 [ERROR] No URL in response!');
-      console.error('🔴 [ERROR] Full response data:', JSON.stringify(data, null, 2));
       throw new Error('Keine Checkout-URL erhalten. Bitte kontaktieren Sie den Administrator.');
     }
 
-    console.log('🔵 [REDIRECT] Redirecting to Stripe Checkout...');
-    console.log('🔵 [REDIRECT] URL:', data.url);
-    console.log('🔵 [REDIRECT] URL type:', typeof data.url);
-    console.log('🔵 [REDIRECT] URL length:', data.url.length);
-
-    // Use window.location.assign for better compatibility
-    try {
-      window.location.assign(data.url);
-    } catch (redirectError) {
-      console.error('🔴 [ERROR] Redirect failed:', redirectError);
-      // Fallback: try href
-      window.location.href = data.url;
-    }
+    window.location.assign(data.url);
   } catch (error: any) {
     console.error('Checkout session creation error:', error);
 
     // Provide user-friendly error messages
-    if (error.message.includes('not configured') || error.message.includes('not active')) {
+    if (error.message.includes('nicht konfiguriert') || error.message.includes('nicht aktiv')) {
       throw new Error(
         '⚠️ Stripe ist nicht konfiguriert!\n\n' +
         'Bitte wenden Sie sich an den Administrator, um Stripe zu aktivieren.\n\n' +
@@ -146,25 +86,11 @@ export async function verifyPaymentSession(sessionId: string): Promise<{
   amount: number;
   currency: string;
 }> {
-  if (!supabase) {
-    throw new Error('Supabase ist nicht konfiguriert');
-  }
-
   try {
-    // Get current session
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session) {
-      throw new Error('Nicht angemeldet');
-    }
-
-    // Call Edge Function to verify session
-    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/verify-payment-session`;
-
-    const response = await fetch(apiUrl, {
+    const response = await fetch(`${getApiBaseUrl()}/stripe-checkout.php?action=verify-session`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${session.access_token}`,
+        ...getAuthHeaders(),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -190,17 +116,7 @@ export async function verifyPaymentSession(sessionId: string): Promise<{
 }
 
 export async function handlePaymentSuccess(sessionId: string, userId: string) {
-  if (!supabase) {
-    throw new Error('Supabase ist nicht konfiguriert');
-  }
-
-  const { data: { user } } = await supabase.auth.getUser();
-
-  if (!user || user.id !== userId) {
-    throw new Error('Benutzer nicht authentifiziert');
-  }
-
-  // Verify session with Stripe
+  // Verify session with Stripe via local PHP API
   const verification = await verifyPaymentSession(sessionId);
 
   if (!verification.verified) {
@@ -241,9 +157,4 @@ export async function handlePaymentSuccess(sessionId: string, userId: string) {
   });
 
   return { success: true, newBalance, amount };
-}
-
-// Helper function to get Supabase URL
-export function getSupabaseUrl(): string {
-  return import.meta.env.VITE_SUPABASE_URL;
 }

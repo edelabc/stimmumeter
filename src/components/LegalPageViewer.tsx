@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FileText } from 'lucide-react';
-import { supabase } from '../lib/supabase';
+import { apiClient } from '../lib/api-client';
 
 interface LegalPageViewerProps {
   pageType: string;
@@ -15,14 +15,15 @@ export function LegalPageViewer({ pageType }: LegalPageViewerProps) {
   }, [pageType]);
 
   const loadPage = async () => {
-    const { data } = await supabase
-      .from('legal_pages')
-      .select('title, content')
-      .eq('page_type', pageType)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    setPage(data);
+    try {
+      const response = await apiClient.get<{ title: string; content: string } | null>(
+        `/legal-pages.php?action=get&type=${encodeURIComponent(pageType)}`
+      );
+      setPage(response.data || null);
+    } catch (error) {
+      console.warn('Fehler beim Laden der Legal Page:', error);
+      setPage(null);
+    }
     setLoading(false);
   };
 

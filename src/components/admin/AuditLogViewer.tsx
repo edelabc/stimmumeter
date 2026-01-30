@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FileText, AlertCircle, Info, AlertTriangle, XCircle, RefreshCw, Search, Filter } from 'lucide-react';
+import { apiClient } from '../../lib/api-client';
 
 interface AuditLog {
   id: string;
@@ -20,6 +21,7 @@ export function AuditLogViewer() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [severityFilter, setSeverityFilter] = useState<string>('all');
   const [expandedLog, setExpandedLog] = useState<string | null>(null);
+  const [_total, setTotal] = useState(0);
 
   useEffect(() => {
     loadLogs();
@@ -28,10 +30,17 @@ export function AuditLogViewer() {
   const loadLogs = async () => {
     setLoading(true);
     try {
-      // TODO: Implement audit logs API
-      // Temporarily return empty array until API is implemented
-      console.warn('Audit logs API not yet implemented - showing empty state');
-      setLogs([]);
+      const response: any = await apiClient.get('/audit-logs.php?action=list&limit=500');
+
+      if (response && response.data && Array.isArray(response.data)) {
+        setLogs(response.data);
+        setTotal(response.total || response.data.length);
+      } else if (response && response.success === false) {
+        console.error('Audit Logs API error:', response.error);
+        setLogs([]);
+      } else {
+        setLogs([]);
+      }
     } catch (error: any) {
       console.error('Error loading audit logs:', error);
       setLogs([]);

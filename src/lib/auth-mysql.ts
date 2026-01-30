@@ -3,7 +3,7 @@
  * Verwendet PHP-API-Endpunkte statt Supabase
  */
 
-import { apiClient, getApiBaseUrl } from './api-client';
+import { getApiBaseUrl } from './api-client';
 
 // API Base URL dynamisch bestimmen
 const API_BASE_URL = (): string => getApiBaseUrl();
@@ -296,3 +296,54 @@ export function getAuthHeaders(): Record<string, string> {
     return {};
 }
 
+/**
+ * Passwort ändern
+ */
+export async function updatePassword(newPassword: string) {
+    try {
+        const token = getToken();
+        if (!token) {
+            return {
+                data: null,
+                error: {
+                    name: 'AuthError',
+                    message: 'Nicht angemeldet',
+                },
+            };
+        }
+
+        const response = await fetch(`${API_BASE_URL()}/auth.php?action=update-password`, {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${token}`,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ password: newPassword }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            return {
+                data: null,
+                error: {
+                    name: 'AuthError',
+                    message: data.error || 'Passwort-Änderung fehlgeschlagen',
+                },
+            };
+        }
+
+        return {
+            data: data,
+            error: null,
+        };
+    } catch (err: any) {
+        return {
+            data: null,
+            error: {
+                name: 'AuthError',
+                message: err.message || 'Netzwerkfehler bei der Passwort-Änderung',
+            },
+        };
+    }
+}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { FileText, Download, TrendingUp, TrendingDown, Receipt } from 'lucide-react';
 import { getAccountTransactions, type AccountTransaction } from '../lib/billing';
-import { supabase } from '../lib/supabase';
+import { getCurrentUser } from '../lib/auth-mysql';
 
 export function AccountStatement() {
   const [transactions, setTransactions] = useState<AccountTransaction[]>([]);
@@ -14,7 +14,7 @@ export function AccountStatement() {
 
   const loadTransactions = async () => {
     setLoading(true);
-    const { data: { user } } = await supabase.auth.getUser();
+    const user = await getCurrentUser();
     if (!user) return;
 
     const { data } = await getAccountTransactions(user.id);
@@ -187,9 +187,8 @@ export function AccountStatement() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-right text-green-600 font-medium">
                     {transaction.credit ? formatCurrency(transaction.credit) : '-'}
                   </td>
-                  <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${
-                    transaction.balance_after >= 0 ? 'text-gray-900' : 'text-red-600'
-                  }`}>
+                  <td className={`px-6 py-4 whitespace-nowrap text-sm text-right font-bold ${transaction.balance_after >= 0 ? 'text-gray-900' : 'text-red-600'
+                    }`}>
                     {formatCurrency(transaction.balance_after)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-center">

@@ -113,3 +113,4 @@ WHERE v.`status` = 'Unterzeichnet' AND (v.`slug` IS NULL OR v.`slug` = '');
 
 
 
+

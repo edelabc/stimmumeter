@@ -250,6 +250,49 @@ try {
                 
                 http_response_code(404);
                 echo json_encode(['error' => 'Vereinbarung nicht gefunden']);
+            } elseif ($action === 'getByTitle') {
+                // Suche Vereinbarung nach Titel-Namen
+                $title = $_GET['title'] ?? '';
+                if (empty($title)) {
+                    http_response_code(400);
+                    echo json_encode(['error' => 'Titel erforderlich']);
+                    exit;
+                }
+                
+                // Suche den Titel in t_vereinbarungstitel
+                $stmt = $pdo->prepare("
+                    SELECT vt.id as titel_id, vt.titel, vt.beschreibung
+                    FROM t_vereinbarungstitel vt
+                    WHERE vt.titel = ?
+                ");
+                $stmt->execute([$title]);
+                $titelData = $stmt->fetch();
+                
+                if (!$titelData) {
+                    // Kein Titel gefunden - gebe leere Antwort statt Fehler zurück
+                    echo json_encode(['success' => true, 'data' => null]);
+                    exit;
+                }
+                
+                // Suche die aktive Vereinbarung mit diesem Titel
+                $stmt = $pdo->prepare("
+                    SELECT v.*, vt.titel as titel_name, vt.beschreibung as titel_beschreibung
+                    FROM t_vereinbarungen v
+                    LEFT JOIN t_vereinbarungstitel vt ON v.titel_id = vt.id
+                    WHERE v.titel_id = ? AND v.status = 'Unterzeichnet'
+                    ORDER BY v.version DESC
+                    LIMIT 1
+                ");
+                $stmt->execute([$titelData['titel_id']]);
+                $agreement = $stmt->fetch();
+                
+                if ($agreement) {
+                    echo json_encode(['success' => true, 'data' => $agreement]);
+                } else {
+                    // Kein aktives Agreement unter diesem Titel
+                    echo json_encode(['success' => true, 'data' => null]);
+                }
+                exit;
             } elseif ($action === 'titles') {
                 // Liste aller Vereinbarungstitel
                 $stmt = $pdo->prepare("SELECT * FROM t_vereinbarungstitel ORDER BY titel ASC");

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { X, Settings, CheckCircle } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { apiClient } from '../lib/api-client';
 
 interface CookiePreferences {
   necessary: boolean;
@@ -16,7 +16,7 @@ interface CookieConsentProps {
 export function CookieConsent({ onNavigate }: CookieConsentProps) {
   const [showBanner, setShowBanner] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [agreementContent, setAgreementContent] = useState<string>('');
+  const [_agreementContent, setAgreementContent] = useState<string>('');
   const [agreementVersion, setAgreementVersion] = useState<number>(1);
   const [preferences, setPreferences] = useState<CookiePreferences>({
     necessary: true,
@@ -38,30 +38,13 @@ export function CookieConsent({ onNavigate }: CookieConsentProps) {
   };
 
   const loadAgreement = async () => {
-    if (!supabase || !isSupabaseConfigured()) return; // Supabase nicht verfügbar
-    
     try {
-      const { data, error } = await supabase
-        .from('t_vereinbarungen')
-        .select(`
-          id,
-          version,
-          inhalt,
-          titel:t_vereinbarungstitel!inner(titel)
-        `)
-        .eq('titel.titel', 'Cookie-Einstellungen')
-        .order('version', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (error) {
-        console.warn('⚠️ Fehler beim Laden der Cookie-Vereinbarung:', error.message);
-        return;
-      }
-
-      if (data) {
-        setAgreementContent(data.inhalt);
-        setAgreementVersion(data.version);
+      const response = await apiClient.get<{ inhalt: string; version: number } | null>(
+        '/agreements.php?action=getByTitle&title=Cookie-Einstellungen'
+      );
+      if (response.data) {
+        setAgreementContent(response.data.inhalt || '');
+        setAgreementVersion(response.data.version || 1);
       }
     } catch (error) {
       console.warn('⚠️ Fehler beim Laden der Cookie-Vereinbarung:', error);
@@ -323,4 +306,3 @@ export function CookieConsent({ onNavigate }: CookieConsentProps) {
     </>
   );
 }
-

@@ -167,3 +167,4 @@ SELECT `page_type`, `title`, `is_active` FROM `legal_pages` ORDER BY `page_type`
 
 
 
+
